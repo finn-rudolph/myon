@@ -1,60 +1,37 @@
-pub struct SparseMatrix {
-    end: Vec<u32>,
+use std::ops::Mul;
+
+pub struct CscMatrix {
+    start: Vec<u32>,
     ones: Vec<u32>,
 }
 
-pub struct BlockMatrix {
-    mat: Vec<Vec<u64>>,
+struct CsrMatrix<'a> {
+    borrowed: &'a CscMatrix,
 }
 
-pub fn mul_ab(a: &BlockMatrix, b: &BlockMatrix) -> BlockMatrix {
-    let m = a.mat.len();
-    let n = a.mat[0].len();
-    let mut res: BlockMatrix = BlockMatrix {
-        mat: vec![vec![n as u64]; m],
-    };
+pub struct BlockMatrix(Vec<u64>);
+struct TransposedBlockMatrix<'a> {
+    borrowed: &'a BlockMatrix,
+}
 
-    for l in 0..m {
-        for i in 0..n {
-            for j in 0..m {
-                let mut x = a.mat[i][j];
-                let mut k = 0;
-                while x != 0 {
-                    if (x & 1) != 0 {
-                        res.mat[l][i] ^= b.mat[l][(j << 6) + k];
-                    }
-                    x >>= 1;
-                    k += 1;
-                }
-            }
-        }
+impl CscMatrix {
+    pub fn transpose(&self) -> CsrMatrix {
+        CsrMatrix { borrowed: self }
     }
-
-    res
 }
 
-pub fn mul_atb(a: &BlockMatrix, b: &BlockMatrix) -> BlockMatrix {
-    let m = a.mat.len();
-    let n = a.mat[0].len();
-    let mut res: BlockMatrix = BlockMatrix {
-        mat: vec![vec![64 as u64]; m],
-    };
-
-    for l in 0..m {
-        for i in 0..n {
-            for j in 0..m {
-                let mut x = a.mat[i][j];
-                let mut k = 0;
-                while x != 0 {
-                    if (x & 1) != 0 {
-                        res.mat[l][(j << 6) + k] ^= b.mat[l][i];
-                    }
-                    x >>= 1;
-                    k += 1;
-                }
-            }
-        }
+impl BlockMatrix {
+    pub fn transpose(&self) -> TransposedBlockMatrix {
+        TransposedBlockMatrix { borrowed: self }
     }
-
-    res
 }
+
+impl Mul<BlockMatrix> for CscMatrix {}
+
+impl Mul<BlockMatrix> for CsrMatrix {}
+
+impl Mul<BlockMatrix> for BlockMatrix {}
+
+impl Mul<TransposedBlockMatrix> for BlockMatrix {}
+
+impl Mul<BlockMatrix> for TransposedBlockMatrix {}
