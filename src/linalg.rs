@@ -14,6 +14,7 @@ pub struct CsrMatrix<'a> {
     borrowed: &'a CscMatrix,
 }
 
+#[derive(Clone)]
 pub struct BlockMatrix(Vec<u64>);
 pub struct TransposedBlockMatrix<'a> {
     borrowed: &'a BlockMatrix,
