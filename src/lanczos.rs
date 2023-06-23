@@ -29,7 +29,7 @@ fn max_invertible_submatrix(mut vtav: BlockMatrix) -> (u64, BlockMatrix) {
         if (vtav[i] >> i) & 1 == 1 {
             d |= 1u64 << i;
             for j in 0..N {
-                if i != j && vtav[j] >> i & 1 == 1 {
+                if i != j && (vtav[j] >> i) & 1 == 1 {
                     vtav[j] ^= vtav[i];
                     w_inv[j] ^= w_inv[i];
                 }
@@ -92,10 +92,12 @@ fn update_gamma(
     res
 }
 
-pub fn lanczos(a: &CscMatrix) -> BlockMatrix {
+// Finds a matrix x, such that a * aT * x = b, using the Block Lanczos
+// algorithm.
+pub fn lanczos(a: &CscMatrix, b: &BlockMatrix) -> BlockMatrix {
     let n = a.len();
 
-    let mut v = blockmatrix![0; n];
+    let mut v = b.clone();
     let mut p = blockmatrix![0; n];
     let mut x = blockmatrix![0; n];
     let mut gamma: [BlockMatrix; 2] = [blockmatrix![0; N], blockmatrix![0; N]];
@@ -103,13 +105,8 @@ pub fn lanczos(a: &CscMatrix) -> BlockMatrix {
 
     let mut d: u64;
 
-    x[0] = 998244353; // fill x somewhat randomly (TODO: add RNG later)
-    for i in 0..n {
-        x[i] = x[i - 1] * x[i - 1];
-    }
-
     loop {
-        let av = a * &(a * &v);
+        let av = &a.transpose() * &(a * &v);
         let vtav = &v.transpose() * &av;
         let vta2v = &av.transpose() * &av;
         let w_inv: BlockMatrix;
@@ -152,4 +149,54 @@ pub fn lanczos(a: &CscMatrix) -> BlockMatrix {
     }
 
     x
+}
+
+#[cfg(test)]
+mod tests {
+    use rand::{thread_rng, Rng};
+
+    use super::blockmatrix;
+    use super::lanczos;
+    use super::BlockMatrix;
+    use super::CscMatrix;
+
+    fn random_sparse_matrix(n: usize, m: usize, avg_ones: usize) -> CscMatrix {
+        let mut end: Vec<u32> = vec![0; 0];
+        let mut ones: Vec<u32> = vec![0; 0];
+
+        for _ in 0..n {
+            let weight = thread_rng().gen_range(0..(avg_ones << 1));
+            for _ in 0..weight {
+                ones.push(thread_rng().gen_range(0..m) as u32);
+            }
+            end.push(ones.len() as u32);
+        }
+
+        CscMatrix::new(end, ones)
+    }
+
+    fn random_block_matrix(n: usize) -> BlockMatrix {
+        let mut a = blockmatrix![0; n];
+        for i in 0..n {
+            a[i] = thread_rng().gen::<u64>();
+        }
+        a
+    }
+
+    #[test]
+    fn test_lanczos() {
+        for _ in 0..42 {
+            let n = thread_rng().gen_range(100..2000);
+            let m = thread_rng().gen_range(n - 20..n);
+            let avg_ones = thread_rng().gen_range(m / 40..m / 5);
+
+            let a = random_sparse_matrix(n, m, avg_ones);
+            let b = random_block_matrix(n);
+            let x = lanczos(&a, &b);
+            let y = &a * &x;
+            for i in 0..n {
+                assert_eq!(y[i], b[i]);
+            }
+        }
+    }
 }

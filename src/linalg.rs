@@ -21,6 +21,9 @@ pub struct TransposedBlockMatrix<'a> {
 }
 
 impl CscMatrix {
+    pub fn new(end: Vec<u32>, ones: Vec<u32>) -> CscMatrix {
+        CscMatrix { end, ones }
+    }
     pub fn len(&self) -> usize {
         self.end.len()
     }
