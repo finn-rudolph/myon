@@ -37,6 +37,14 @@ impl BlockMatrix {
     }
 }
 
+macro_rules! blockmatrix {
+    ( $x:expr; $n:expr ) => {
+        BlockMatrix::from(vec![$x; $n])
+    };
+}
+
+pub(crate) use blockmatrix;
+
 impl From<Vec<u64>> for BlockMatrix {
     fn from(x: Vec<u64>) -> Self {
         BlockMatrix(x)
