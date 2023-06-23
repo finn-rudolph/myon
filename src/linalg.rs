@@ -1,3 +1,6 @@
+use std::convert::From;
+use std::ops::Index;
+use std::ops::IndexMut;
 use std::ops::Mul;
 
 pub struct CscMatrix {
@@ -15,14 +18,42 @@ pub struct TransposedBlockMatrix<'a> {
 }
 
 impl CscMatrix {
+    pub fn len(&self) -> usize {
+        self.end.len()
+    }
+
     pub fn transpose(&self) -> CsrMatrix {
         CsrMatrix { borrowed: self }
     }
 }
 
 impl BlockMatrix {
+    pub fn len(&self) -> usize {
+        self.len()
+    }
+
     pub fn transpose(&self) -> TransposedBlockMatrix {
         TransposedBlockMatrix { borrowed: self }
+    }
+}
+
+impl From<Vec<u64>> for BlockMatrix {
+    fn from(x: Vec<u64>) -> Self {
+        BlockMatrix(x)
+    }
+}
+
+impl Index<usize> for BlockMatrix {
+    type Output = u64;
+
+    fn index(&self, i: usize) -> &u64 {
+        &self.0[i]
+    }
+}
+
+impl IndexMut<usize> for BlockMatrix {
+    fn index_mut(&mut self, i: usize) -> &mut u64 {
+        &mut self.0[i]
     }
 }
 
@@ -31,12 +62,12 @@ impl Mul<&BlockMatrix> for &CscMatrix {
 
     fn mul(self, b: &BlockMatrix) -> BlockMatrix {
         let n = self.end.len();
-        let mut res = BlockMatrix(vec![0; n]);
+        let mut res = BlockMatrix::from(vec![0; n]);
 
         let mut j = 0;
         for i in 0..n {
             while j < self.end[i] {
-                res.0[i] ^= b.0[self.ones[j as usize] as usize];
+                res[i] ^= b[self.ones[j as usize] as usize];
                 j += 1;
             }
         }
@@ -50,12 +81,12 @@ impl<'a> Mul<&BlockMatrix> for &CsrMatrix<'a> {
 
     fn mul(self, b: &BlockMatrix) -> BlockMatrix {
         let n = self.borrowed.end.len();
-        let mut res = BlockMatrix(vec![0; n]);
+        let mut res = BlockMatrix::from(vec![0; n]);
 
         let mut j = 0;
         for i in 0..n {
             while j < self.borrowed.end[i] {
-                res.0[self.borrowed.ones[j as usize] as usize] ^= b.0[i];
+                res[self.borrowed.ones[j as usize] as usize] ^= b[i];
                 j += 1;
             }
         }
@@ -68,15 +99,15 @@ impl Mul<&BlockMatrix> for &BlockMatrix {
     type Output = BlockMatrix;
 
     fn mul(self, b: &BlockMatrix) -> BlockMatrix {
-        let n = self.0.len();
-        let mut res = BlockMatrix(vec![0; n]);
+        let n = self.len();
+        let mut res = BlockMatrix::from(vec![0; n]);
 
         for i in 0..n {
-            let mut x = self.0[i];
+            let mut x = self[i];
             let mut k = 0;
             while x != 0 {
                 if (x & 1) != 0 {
-                    res.0[i] ^= b.0[k];
+                    res[i] ^= b[k];
                 }
                 x >>= 1;
                 k += 1;
@@ -91,11 +122,11 @@ impl<'a> Mul<&TransposedBlockMatrix<'a>> for &BlockMatrix {
     type Output = BlockMatrix;
 
     fn mul(self, b: &TransposedBlockMatrix<'a>) -> BlockMatrix {
-        let mut res = BlockMatrix(vec![0; 64]);
+        let mut res = BlockMatrix::from(vec![0; 64]);
 
         for i in 0..64 {
             for j in 0..64 {
-                res.0[i] |= (((self.0[i] & b.borrowed.0[j]).count_ones() & 1) as u64) << j;
+                res[i] |= (((self[i] & b.borrowed[j]).count_ones() & 1) as u64) << j;
             }
         }
 
@@ -107,15 +138,15 @@ impl<'a> Mul<&BlockMatrix> for &TransposedBlockMatrix<'a> {
     type Output = BlockMatrix;
 
     fn mul(self, b: &BlockMatrix) -> BlockMatrix {
-        let n = self.borrowed.0.len();
-        let mut res = BlockMatrix(vec![0; 64]);
+        let n = self.borrowed.len();
+        let mut res = BlockMatrix::from(vec![0; 64]);
 
         for i in 0..n {
-            let mut x = self.borrowed.0[i];
+            let mut x = self.borrowed[i];
             let mut k = 0;
             while x != 0 {
                 if (x & 1) != 0 {
-                    res.0[k] ^= b.0[i];
+                    res[k] ^= b[i];
                 }
                 x >>= 1;
                 k += 1;
