@@ -3,6 +3,8 @@ use std::ops::Index;
 use std::ops::IndexMut;
 use std::ops::Mul;
 
+pub const N: usize = 64;
+
 pub struct CscMatrix {
     end: Vec<u32>,
     ones: Vec<u32>,
@@ -29,11 +31,27 @@ impl CscMatrix {
 
 impl BlockMatrix {
     pub fn len(&self) -> usize {
-        self.len()
+        self.0.len()
+    }
+
+    pub fn swap(&mut self, i: usize, j: usize) {
+        self.0.swap(i, j);
     }
 
     pub fn transpose(&self) -> TransposedBlockMatrix {
         TransposedBlockMatrix { borrowed: self }
+    }
+
+    pub fn is_symmetric(&self) -> bool {
+        assert_eq!(self.len(), N);
+        for i in 0..N {
+            for j in 0..N {
+                if (self[i] >> j) & 1 != (self[j] >> i) & 1 {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 }
 
@@ -130,10 +148,10 @@ impl<'a> Mul<&TransposedBlockMatrix<'a>> for &BlockMatrix {
     type Output = BlockMatrix;
 
     fn mul(self, b: &TransposedBlockMatrix<'a>) -> BlockMatrix {
-        let mut res = BlockMatrix::from(vec![0; 64]);
+        let mut res = BlockMatrix::from(vec![0; N]);
 
-        for i in 0..64 {
-            for j in 0..64 {
+        for i in 0..N {
+            for j in 0..N {
                 res[i] |= (((self[i] & b.borrowed[j]).count_ones() & 1) as u64) << j;
             }
         }
@@ -147,7 +165,7 @@ impl<'a> Mul<&BlockMatrix> for &TransposedBlockMatrix<'a> {
 
     fn mul(self, b: &BlockMatrix) -> BlockMatrix {
         let n = self.borrowed.len();
-        let mut res = BlockMatrix::from(vec![0; 64]);
+        let mut res = BlockMatrix::from(vec![0; N]);
 
         for i in 0..n {
             let mut x = self.borrowed[i];
