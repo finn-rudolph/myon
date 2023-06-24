@@ -116,7 +116,7 @@ fn update_delta(
 // Attempts to find a matrix x, such that a * x = a * b. Most of the time, it fails to do that, but
 // using v from the last iteration, it's still possible to find some dependencies.
 fn lanczos(a: &CscMatrix, b: &BlockMatrix) -> (BlockMatrix, BlockMatrix) {
-    let n = a.len();
+    let (n, m) = (a.num_cols(), a.num_rows());
 
     let v0 = &a.transpose() * &(a * b);
     let mut v = v0.clone();
@@ -145,7 +145,7 @@ fn lanczos(a: &CscMatrix, b: &BlockMatrix) -> (BlockMatrix, BlockMatrix) {
         }
         assert!(w_inv.is_symmetric());
 
-        if total_d + N < a.m {
+        if total_d + N < m {
             assert_eq!(previous_d | d, !0u64);
         }
         total_d += d.count_ones() as usize;
@@ -193,7 +193,7 @@ fn lanczos(a: &CscMatrix, b: &BlockMatrix) -> (BlockMatrix, BlockMatrix) {
 // Uses x and vm to find vectors in the nullspace of a by elimination. The returned BlockMatrix
 // contains the vectors found in the lower order bits, the remaining bits are zeroed.
 fn combine_columns(a: &CscMatrix, mut x: BlockMatrix, vm: BlockMatrix) -> BlockMatrix {
-    let (n, m) = (a.len(), a.m);
+    let (n, m) = (a.num_cols(), a.num_rows());
     let mut r: Vec<Vec<u64>> = (a * &x).explicit_transpose();
     r.append(&mut (a * &vm).explicit_transpose());
     let mut s: Vec<Vec<u64>> = x.explicit_transpose();
@@ -244,7 +244,7 @@ fn combine_columns(a: &CscMatrix, mut x: BlockMatrix, vm: BlockMatrix) -> BlockM
 // Returns a block of vectors in the null space of a. Tries different choices of the initial random
 // matrix until success.
 pub fn find_dependencies(a: &CscMatrix) -> BlockMatrix {
-    let n = a.len();
+    let n = a.num_cols();
     let mut xo = Xoshiro256PlusPlus::seed_from_u64(998244353);
 
     loop {

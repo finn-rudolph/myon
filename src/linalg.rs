@@ -19,12 +19,12 @@ pub(crate) use blockmatrix;
 // Column-major sparse matrix storing for each column the ones' positions in a contiguous subsegment
 // in 'ones'. The index after the last element of column i is end[i].
 pub struct CscMatrix {
-    pub m: usize,  // number of rows
+    m: usize,      // number of rows
     end: Vec<u32>, // number of columns = end.len()
     ones: Vec<u32>,
 }
 
-pub struct CsrMatrix<'a> {
+pub struct CscMatrixTranspose<'a> {
     borrowed: &'a CscMatrix,
 }
 
@@ -32,7 +32,7 @@ pub struct CsrMatrix<'a> {
 #[derive(Clone)]
 pub struct BlockMatrix(Vec<u64>);
 
-pub struct TransposedBlockMatrix<'a> {
+pub struct BlockMatrixTranspose<'a> {
     borrowed: &'a BlockMatrix,
 }
 
@@ -61,14 +61,18 @@ impl CscMatrix {
         CscMatrix::new(m, end, ones)
     }
 
-    pub fn len(&self) -> usize {
+    pub fn num_cols(&self) -> usize {
         self.end.len()
+    }
+
+    pub fn num_rows(&self) -> usize {
+        self.m
     }
 
     // Returns a view on the transposed matrix. The view is tightly bound to the original CscMatrix
     // and is intended to be used only in composition with the '*'-Operator.
-    pub fn transpose(&self) -> CsrMatrix {
-        CsrMatrix { borrowed: self }
+    pub fn transpose(&self) -> CscMatrixTranspose {
+        CscMatrixTranspose { borrowed: self }
     }
 }
 
@@ -91,8 +95,8 @@ impl BlockMatrix {
 
     // Provides a lightweight view on the transposed matrix, which isn't intendend to be used
     // standalone, but as an argument to the '*'-Operator (on any side).
-    pub fn transpose(&self) -> TransposedBlockMatrix {
-        TransposedBlockMatrix { borrowed: self }
+    pub fn transpose(&self) -> BlockMatrixTranspose {
+        BlockMatrixTranspose { borrowed: self }
     }
 
     // Calculates the transpose explicity as a two-dimensional vector, in row-major format.
@@ -162,7 +166,7 @@ impl Mul<&BlockMatrix> for &CscMatrix {
     }
 }
 
-impl<'a> Mul<&BlockMatrix> for &CsrMatrix<'a> {
+impl<'a> Mul<&BlockMatrix> for &CscMatrixTranspose<'a> {
     type Output = BlockMatrix;
 
     fn mul(self, b: &BlockMatrix) -> BlockMatrix {
@@ -206,10 +210,10 @@ impl Mul<&BlockMatrix> for &BlockMatrix {
     }
 }
 
-impl<'a> Mul<&TransposedBlockMatrix<'a>> for &BlockMatrix {
+impl<'a> Mul<&BlockMatrixTranspose<'a>> for &BlockMatrix {
     type Output = BlockMatrix;
 
-    fn mul(self, b: &TransposedBlockMatrix<'a>) -> BlockMatrix {
+    fn mul(self, b: &BlockMatrixTranspose<'a>) -> BlockMatrix {
         let n = self.len();
         assert!(n >= N);
         assert_eq!(N, b.borrowed.len());
@@ -225,7 +229,7 @@ impl<'a> Mul<&TransposedBlockMatrix<'a>> for &BlockMatrix {
     }
 }
 
-impl<'a> Mul<&BlockMatrix> for &TransposedBlockMatrix<'a> {
+impl<'a> Mul<&BlockMatrix> for &BlockMatrixTranspose<'a> {
     type Output = BlockMatrix;
 
     fn mul(self, b: &BlockMatrix) -> BlockMatrix {
