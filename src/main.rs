@@ -1,11 +1,17 @@
-use rug::{self, Integer};
+use rug::{Complete, Integer};
 use std::io;
 
-pub mod linalg;
+pub mod qs;
 
 fn main() {
     let stdin = io::stdin();
     let mut buffer = String::new();
     let _ = stdin.read_line(&mut buffer);
-    let n = Integer::parse(buffer);
+    let n = Integer::parse(buffer).unwrap().complete();
+    let (p, q) = qs::factorize(&n);
+    println!(
+        "Factored n with\np = {}\nq = {}",
+        p.to_string(),
+        q.to_string()
+    );
 }
