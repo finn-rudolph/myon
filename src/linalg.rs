@@ -8,6 +8,14 @@ use rand_xoshiro::Xoshiro256PlusPlus;
 
 pub const N: usize = 64;
 
+macro_rules! blockmatrix {
+    ( $x:expr; $n:expr ) => {
+        BlockMatrix::from(vec![$x; $n])
+    };
+}
+
+pub(crate) use blockmatrix;
+
 // Column-major sparse matrix storing for each column the ones' positions in a contiguous subsegment
 // in 'ones'. The index after the last element of column i is end[i].
 pub struct CscMatrix {
@@ -113,14 +121,6 @@ impl BlockMatrix {
         return true;
     }
 }
-
-macro_rules! blockmatrix {
-    ( $x:expr; $n:expr ) => {
-        BlockMatrix::from(vec![$x; $n])
-    };
-}
-
-pub(crate) use blockmatrix;
 
 impl From<Vec<u64>> for BlockMatrix {
     fn from(x: Vec<u64>) -> Self {

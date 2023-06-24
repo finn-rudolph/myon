@@ -1,15 +1,16 @@
+#[path = "linalg.rs"]
+mod linalg;
+
 use std::io;
 use std::io::Write;
 
-#[path = "linalg.rs"]
-pub mod linalg;
+use rand_xoshiro::rand_core::SeedableRng;
+use rand_xoshiro::Xoshiro256PlusPlus;
 
 use linalg::blockmatrix;
 use linalg::BlockMatrix;
 use linalg::CscMatrix;
 use linalg::N;
-use rand_xoshiro::rand_core::SeedableRng;
-use rand_xoshiro::Xoshiro256PlusPlus;
 
 // Finds the largest possible amount of rows / columns, such that the principal submatrix of vtav as
 // indicated by d is invertible. This function is inspired by the pseudocode in Montgomery, P. L.
