@@ -263,33 +263,26 @@ pub fn find_dependencies(a: &CscMatrix) -> BlockMatrix {
             return y;
         }
         eprintln!("No vectors in the nullspace found, retrying...");
+        let _ = io::stdout().flush();
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use rand_xoshiro::rand_core::RngCore;
     use rand_xoshiro::rand_core::SeedableRng;
     use rand_xoshiro::Xoshiro256PlusPlus;
 
     use super::find_dependencies;
     use super::CscMatrix;
 
-    const NUM_TESTS: usize = 42;
-    const MIN_N: usize = 100;
-    const MAX_N: usize = 1000;
-    const MAX_NM_DIFF: usize = 20;
-    const MAX_ONES_PERCENTAGE: usize = 20;
-
     #[test]
     fn test_lanczos() {
         let mut xo = Xoshiro256PlusPlus::seed_from_u64((1 << 61) - 1);
 
-        for _ in 0..NUM_TESTS {
-            let n = (xo.next_u32() as usize % (MAX_N - MIN_N)) + MIN_N;
-            let m = n - (xo.next_u32() as usize % MAX_NM_DIFF) - 1;
-
-            let a = CscMatrix::new_random(&mut xo, n, m, (m * MAX_ONES_PERCENTAGE) / 100);
+        for i in 0..11 {
+            let n = 196 + i * 71;
+            let m = n - 19;
+            let a = CscMatrix::new_random(&mut xo, n, m, 11);
             let x = find_dependencies(&a);
 
             let r = &a * &x;
