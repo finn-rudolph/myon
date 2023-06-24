@@ -1,3 +1,6 @@
+use std::io;
+use std::io::Write;
+
 #[path = "linalg.rs"]
 pub mod linalg;
 
@@ -6,7 +9,7 @@ use linalg::BlockMatrix;
 use linalg::CscMatrix;
 use linalg::N;
 use rand_xoshiro::rand_core::SeedableRng;
-use rand_xoshiro::Xoshiro256StarStar;
+use rand_xoshiro::Xoshiro256PlusPlus;
 
 // Finds the largest possible amount of rows / columns, such that the principal submatrix of vtav as
 // indicated by d is invertible.
@@ -136,14 +139,14 @@ fn lanczos(a: &CscMatrix, b: &BlockMatrix) -> (BlockMatrix, BlockMatrix) {
         }
         total_d += d.count_ones() as usize;
 
+        // Compute c.
         let mut tmp = blockmatrix![0; N];
         for i in 0..N {
             tmp[i] = (vta2v[i] & d) ^ (vtav[i] & !d);
         }
         let c = &w_inv * &tmp;
 
-        // Compute new v.
-
+        // Compute v.
         tmp = &v * &c;
         let pvtav = &p * &vtav;
         let previous_v = v.clone();
@@ -151,17 +154,19 @@ fn lanczos(a: &CscMatrix, b: &BlockMatrix) -> (BlockMatrix, BlockMatrix) {
             v[i] = (av[i] & d) ^ (previous_v[i] & !d) ^ tmp[i] ^ (pvtav[i] & d);
         }
 
+        // Compute p.
         let vw_inv = &previous_v * &w_inv;
         for i in 0..n {
             p[i] = vw_inv[i] ^ (p[i] & !d);
         }
 
         // Update x.
-
         tmp = &vw_inv * &delta[0].transpose();
         for i in 0..n {
             x[i] ^= tmp[i];
         }
+
+        // Update delta.
         if iterations != 0 {
             delta = update_delta(delta, &c, &vtav, &w_inv, d);
         } else {
@@ -225,22 +230,37 @@ fn combine_columns(a: &CscMatrix, mut x: BlockMatrix, vm: BlockMatrix) -> BlockM
 }
 
 // Returns a block of vectors in the null space of a.
-pub fn find_nullvectors(a: &CscMatrix) -> BlockMatrix {
+pub fn find_dependencies(a: &CscMatrix) -> BlockMatrix {
     let n = a.len();
-    let mut xo = Xoshiro256StarStar::seed_from_u64(998244353);
+    let mut xo = Xoshiro256PlusPlus::seed_from_u64(998244353);
 
-    let y = BlockMatrix::new_random(n, &mut xo);
-    let (x, vm) = lanczos(a, &y);
-    combine_columns(a, x, vm)
+    loop {
+        let (x, vm) = lanczos(a, &BlockMatrix::new_random(n, &mut xo));
+        let y = combine_columns(a, x, vm);
+        let mut u: u64 = 0;
+        for i in 0..n {
+            u |= y[i];
+        }
+
+        if u != 0 {
+            eprintln!(
+                "Found {} nontrivial vectors in the nullspace of A.",
+                u.count_ones()
+            );
+            let _ = io::stdout().flush();
+            return y;
+        }
+        eprintln!("No vectors in the nullspace found, retrying...");
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use rand_xoshiro::rand_core::RngCore;
     use rand_xoshiro::rand_core::SeedableRng;
-    use rand_xoshiro::Xoshiro256StarStar;
+    use rand_xoshiro::Xoshiro256PlusPlus;
 
-    use super::find_nullvectors;
+    use super::find_dependencies;
     use super::CscMatrix;
 
     const NUM_TESTS: usize = 42;
@@ -251,17 +271,17 @@ mod tests {
 
     #[test]
     fn test_lanczos() {
-        let mut xo = Xoshiro256StarStar::seed_from_u64((1 << 61) - 1);
+        let mut xo = Xoshiro256PlusPlus::seed_from_u64((1 << 61) - 7);
 
         for _ in 0..NUM_TESTS {
             let n = (xo.next_u32() as usize % (MAX_N - MIN_N)) + MIN_N;
-            let m = n - (xo.next_u32() as usize % MAX_NM_DIFF);
+            let m = n - (xo.next_u32() as usize % MAX_NM_DIFF) - 1;
 
             let a = CscMatrix::new_random(&mut xo, n, m, m / MAX_ONES_FRAC);
-            let x = find_nullvectors(&a);
+            let x = find_dependencies(&a);
 
             let r = &a * &x;
-            for i in 0..a.m {
+            for i in 0..m {
                 assert_eq!(r[i], 0);
             }
         }

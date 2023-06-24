@@ -4,7 +4,7 @@ use std::ops::IndexMut;
 use std::ops::Mul;
 
 use rand_xoshiro::rand_core::RngCore;
-use rand_xoshiro::Xoshiro256StarStar;
+use rand_xoshiro::Xoshiro256PlusPlus;
 
 pub const N: usize = 64;
 
@@ -30,7 +30,7 @@ impl CscMatrix {
     }
 
     pub fn new_random(
-        xo: &mut Xoshiro256StarStar,
+        xo: &mut Xoshiro256PlusPlus,
         n: usize,
         m: usize,
         max_ones: usize,
@@ -59,7 +59,7 @@ impl CscMatrix {
 }
 
 impl BlockMatrix {
-    pub fn new_random(n: usize, xo: &mut Xoshiro256StarStar) -> BlockMatrix {
+    pub fn new_random(n: usize, xo: &mut Xoshiro256PlusPlus) -> BlockMatrix {
         let mut a = blockmatrix![0; n];
         for i in 0..n {
             a[i] = xo.next_u64();
