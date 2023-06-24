@@ -79,6 +79,19 @@ impl BlockMatrix {
         TransposedBlockMatrix { borrowed: self }
     }
 
+    pub fn explicit_transpose(&self) -> Vec<Vec<u64>> {
+        let n_words = (self.len() + N) / N;
+        let mut res: Vec<Vec<u64>> = vec![vec![0; n_words]; N];
+
+        for i in 0..self.len() {
+            for j in 0..N {
+                res[j][i / N] |= ((self[i] >> j) & 1) << (i & (N - 1));
+            }
+        }
+
+        res
+    }
+
     pub fn is_symmetric(&self) -> bool {
         assert_eq!(self.len(), N);
         for i in 0..N {

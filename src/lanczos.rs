@@ -5,6 +5,8 @@ use linalg::blockmatrix;
 use linalg::BlockMatrix;
 use linalg::CscMatrix;
 use linalg::N;
+use rand_xoshiro::rand_core::SeedableRng;
+use rand_xoshiro::Xoshiro256StarStar;
 
 // Finds the largest possible amount of rows / columns, such that the principal
 // submatrix of vtav as indicated by d is invertible.
@@ -96,15 +98,13 @@ fn update_delta(
     res
 }
 
-// Finds a matrix x, such that aT * a * x = aT * a * b, using the Block Lanczos
-// algorithm. Returns the last version of v, too.
-pub fn lanczos(a: &CscMatrix, b: &BlockMatrix) -> (BlockMatrix, BlockMatrix) {
+fn lanczos(a: &CscMatrix, b: &BlockMatrix) -> (BlockMatrix, BlockMatrix) {
     let n = a.len();
 
     let v0 = &a.transpose() * &(a * b);
     let mut v = v0.clone();
     let mut p = blockmatrix![0; n];
-    let mut x = blockmatrix![0; n];
+    let mut x = b.clone();
     let mut delta: [BlockMatrix; 2] = [blockmatrix![0; N], blockmatrix![0; N]];
     delta[0] = &v0.transpose() * &v0;
 
@@ -168,6 +168,72 @@ pub fn lanczos(a: &CscMatrix, b: &BlockMatrix) -> (BlockMatrix, BlockMatrix) {
     }
 
     (x, v)
+}
+
+// Uses x and vm to find vectors in the nullspace of a by elimination. The
+// returned BlockMatrix contains the vectors found in the lower order bits, the
+// remaining bits are zeroed.
+fn combine_columns(a: &CscMatrix, mut x: BlockMatrix, vm: BlockMatrix) -> BlockMatrix {
+    let n = a.len();
+    let mut r: Vec<Vec<u64>> = (a * &x).explicit_transpose();
+    r.append(&mut (a * &vm).explicit_transpose());
+    let mut s: Vec<Vec<u64>> = x.explicit_transpose();
+    s.append(&mut vm.explicit_transpose());
+
+    let mut i: usize = 0;
+    for leading_bit in 0..n {
+        if i >= 2 * N {
+            break;
+        }
+
+        let leading_bit_col: usize = leading_bit / N;
+        let leading_bit_mask: u64 = (leading_bit & (N - 1)) as u64;
+
+        for j in i..2 * N {
+            if r[i][leading_bit_col] & leading_bit_mask != 0 {
+                r.swap(i, j);
+                s.swap(i, j);
+                break;
+            }
+        }
+
+        if r[i][leading_bit_col] & leading_bit_mask != 0 {
+            for j in i..2 * N {
+                if r[j][leading_bit_col] & leading_bit_mask != 0 {
+                    for k in 0..r[i].len() {
+                        r[j][k] ^= r[i][k];
+                        s[j][k] ^= s[i][k];
+                    }
+                }
+            }
+            i += 1;
+        }
+    }
+
+    for j in 0..n {
+        x[j] = 0;
+        for k in i..N {
+            x[j] |= ((s[k][j / N] >> (j & (N - 1))) & 1) << (k - i);
+        }
+    }
+
+    x
+}
+
+// Returns a block of vectors in the null space of a.
+pub fn find_dependencies(a: &CscMatrix) -> BlockMatrix {
+    let n = a.len();
+    let mut xo = Xoshiro256StarStar::seed_from_u64(998244353);
+    let y = BlockMatrix::new_random(n, &mut xo);
+
+    let (x, vm) = lanczos(a, &y);
+    let null_matrix = combine_columns(a, x, vm);
+
+    let z = a * &null_matrix;
+    for i in 0..n {
+        assert_eq!(z[i], 0);
+    }
+    null_matrix
 }
 
 #[cfg(test)]
