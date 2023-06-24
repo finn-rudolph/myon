@@ -176,7 +176,6 @@ mod tests {
     use rand_xoshiro::rand_core::SeedableRng;
     use rand_xoshiro::Xoshiro256StarStar;
 
-    use super::blockmatrix;
     use super::lanczos;
     use super::BlockMatrix;
     use super::CscMatrix;
@@ -187,30 +186,6 @@ mod tests {
     const MAX_NM_DIFF: usize = 20;
     const MAX_ONES_FRAC: usize = 5;
 
-    fn random_sparse_matrix(xo: &mut Xoshiro256StarStar, n: usize, m: usize) -> CscMatrix {
-        let mut end: Vec<u32> = vec![0; 0];
-        let mut ones: Vec<u32> = vec![0; 0];
-        let max_ones = m / MAX_ONES_FRAC;
-
-        for _ in 0..n {
-            let weight = xo.next_u32() as usize % max_ones;
-            for _ in 0..weight {
-                ones.push(xo.next_u32() % m as u32);
-            }
-            end.push(ones.len() as u32);
-        }
-
-        CscMatrix::new(m, end, ones)
-    }
-
-    fn random_block_matrix(xo: &mut Xoshiro256StarStar, n: usize) -> BlockMatrix {
-        let mut a = blockmatrix![0; n];
-        for i in 0..n {
-            a[i] = xo.next_u64();
-        }
-        a
-    }
-
     #[test]
     fn test_lanczos() {
         let mut xo = Xoshiro256StarStar::seed_from_u64((1 << 61) - 1);
@@ -219,8 +194,8 @@ mod tests {
             let n = (xo.next_u32() as usize % (MAX_N - MIN_N)) + MIN_N;
             let m = n - (xo.next_u32() as usize % MAX_NM_DIFF);
 
-            let a = random_sparse_matrix(&mut xo, n, m);
-            let b = random_block_matrix(&mut xo, n);
+            let a = CscMatrix::new_random(&mut xo, n, m, m / MAX_ONES_FRAC);
+            let b = BlockMatrix::new_random(n, &mut xo);
             let (x, vm) = lanczos(&a, &b);
             let y = &a.transpose() * &(&a * &x);
             let z = &a.transpose() * &(&a * &b);

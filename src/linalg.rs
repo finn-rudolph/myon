@@ -3,6 +3,9 @@ use std::ops::Index;
 use std::ops::IndexMut;
 use std::ops::Mul;
 
+use rand_xoshiro::rand_core::RngCore;
+use rand_xoshiro::Xoshiro256StarStar;
+
 pub const N: usize = 64;
 
 pub struct CscMatrix {
@@ -25,6 +28,27 @@ impl CscMatrix {
     pub fn new(m: usize, end: Vec<u32>, ones: Vec<u32>) -> CscMatrix {
         CscMatrix { m, end, ones }
     }
+
+    pub fn new_random(
+        xo: &mut Xoshiro256StarStar,
+        n: usize,
+        m: usize,
+        max_ones: usize,
+    ) -> CscMatrix {
+        let mut end: Vec<u32> = vec![0; 0];
+        let mut ones: Vec<u32> = vec![0; 0];
+
+        for _ in 0..n {
+            let weight = xo.next_u32() as usize % max_ones;
+            for _ in 0..weight {
+                ones.push(xo.next_u32() % m as u32);
+            }
+            end.push(ones.len() as u32);
+        }
+
+        CscMatrix::new(m, end, ones)
+    }
+
     pub fn len(&self) -> usize {
         self.end.len()
     }
@@ -35,6 +59,14 @@ impl CscMatrix {
 }
 
 impl BlockMatrix {
+    pub fn new_random(n: usize, xo: &mut Xoshiro256StarStar) -> BlockMatrix {
+        let mut a = blockmatrix![0; n];
+        for i in 0..n {
+            a[i] = xo.next_u64();
+        }
+        a
+    }
+
     pub fn len(&self) -> usize {
         self.0.len()
     }
