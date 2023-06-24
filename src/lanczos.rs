@@ -70,8 +70,8 @@ fn max_invertible_submatrix(mut vtav: BlockMatrix, previous_d: u64) -> (u64, Blo
     (d, w_inv)
 }
 
-fn update_gamma(
-    mut gamma: [BlockMatrix; 2],
+fn update_delta(
+    mut delta: [BlockMatrix; 2],
     c: &BlockMatrix,
     vtav: &BlockMatrix,
     w_inv: &BlockMatrix,
@@ -84,28 +84,29 @@ fn update_gamma(
         r[i] = c[i] ^ ((1u64 << i) & !d);
     }
 
-    res[0] = &gamma[0] * &r;
-    res[1] = &gamma[0] * w_inv;
-    gamma[0] = &gamma[1] * vtav;
+    res[0] = &delta[0] * &r;
+    res[1] = &delta[0] * w_inv;
+    delta[0] = &delta[1] * vtav;
 
     for i in 0..N {
-        res[0][i] ^= gamma[0][i] & d;
-        res[1][i] ^= gamma[1][i] & !d;
+        res[0][i] ^= delta[0][i] & d;
+        res[1][i] ^= delta[1][i] & !d;
     }
 
     res
 }
 
-// Finds a matrix x, such that a * aT * x = b, using the Block Lanczos
-// algorithm.
-pub fn lanczos(a: &CscMatrix, b: &BlockMatrix) -> BlockMatrix {
+// Finds a matrix x, such that aT * a * x = aT * a * b, using the Block Lanczos
+// algorithm. Returns the last version of v, too.
+pub fn lanczos(a: &CscMatrix, b: &BlockMatrix) -> (BlockMatrix, BlockMatrix) {
     let n = a.len();
 
-    let mut v = b.clone();
+    let v0 = &a.transpose() * &(a * b);
+    let mut v = v0.clone();
     let mut p = blockmatrix![0; n];
     let mut x = blockmatrix![0; n];
-    let mut gamma: [BlockMatrix; 2] = [blockmatrix![0; N], blockmatrix![0; N]];
-    gamma[0] = &v.transpose() * &v;
+    let mut delta: [BlockMatrix; 2] = [blockmatrix![0; N], blockmatrix![0; N]];
+    delta[0] = &v0.transpose() * &v0;
 
     let mut d: u64 = 64;
     let mut total_d: usize = 0;
@@ -150,23 +151,23 @@ pub fn lanczos(a: &CscMatrix, b: &BlockMatrix) -> BlockMatrix {
             p[i] = vw_inv[i] ^ (p[i] & !d);
         }
 
-        // Compute new gamma and update x.
+        // Update x.
 
-        tmp = &vw_inv * &gamma[0].transpose();
+        tmp = &vw_inv * &delta[0].transpose();
         for i in 0..n {
             x[i] ^= tmp[i];
         }
         if iterations != 0 {
-            gamma = update_gamma(gamma, &c, &vtav, &w_inv, d);
+            delta = update_delta(delta, &c, &vtav, &w_inv, d);
         } else {
-            gamma[0] = &b.transpose() * &v;
-            gamma[1] = &b.transpose() * &p;
+            delta[0] = &v0.transpose() * &v;
+            delta[1] = &v0.transpose() * &p;
         }
 
         iterations += 1;
     }
 
-    x
+    (x, v)
 }
 
 #[cfg(test)]
@@ -180,13 +181,19 @@ mod tests {
     use super::BlockMatrix;
     use super::CscMatrix;
 
+    const NUM_TESTS: usize = 42;
+    const MIN_N: usize = 100;
+    const MAX_N: usize = 2000;
+    const MAX_NM_DIFF: usize = 20;
+    const MAX_ONES_FRAC: usize = 5;
+
     fn random_sparse_matrix(xo: &mut Xoshiro256StarStar, n: usize, m: usize) -> CscMatrix {
         let mut end: Vec<u32> = vec![0; 0];
         let mut ones: Vec<u32> = vec![0; 0];
-        let avg_ones = m / 5 + (xo.next_u32() as usize % (m / 5 - m / 40));
+        let max_ones = m / MAX_ONES_FRAC;
 
         for _ in 0..n {
-            let weight = xo.next_u32() as usize % std::cmp::min(m, avg_ones << 1);
+            let weight = xo.next_u32() as usize % max_ones;
             for _ in 0..weight {
                 ones.push(xo.next_u32() % m as u32);
             }
@@ -206,18 +213,19 @@ mod tests {
 
     #[test]
     fn test_lanczos() {
-        let mut xo = Xoshiro256StarStar::seed_from_u64((1 << 42) - 42);
+        let mut xo = Xoshiro256StarStar::seed_from_u64((1 << 61) - 1);
 
-        for _ in 0..42 {
-            let n = (xo.next_u32() as usize % 1900) + 100;
-            let m = n - (xo.next_u32() as usize % 20);
+        for _ in 0..NUM_TESTS {
+            let n = (xo.next_u32() as usize % (MAX_N - MIN_N)) + MIN_N;
+            let m = n - (xo.next_u32() as usize % MAX_NM_DIFF);
 
             let a = random_sparse_matrix(&mut xo, n, m);
             let b = random_block_matrix(&mut xo, n);
-            let x = lanczos(&a, &b);
+            let (x, vm) = lanczos(&a, &b);
             let y = &a.transpose() * &(&a * &x);
+            let z = &a.transpose() * &(&a * &b);
             for i in 0..n {
-                assert_eq!(y[i], b[i]);
+                assert_eq!(y[i], z[i]);
             }
         }
     }
