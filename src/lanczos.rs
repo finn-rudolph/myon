@@ -12,7 +12,8 @@ use rand_xoshiro::rand_core::SeedableRng;
 use rand_xoshiro::Xoshiro256PlusPlus;
 
 // Finds the largest possible amount of rows / columns, such that the principal submatrix of vtav as
-// indicated by d is invertible.
+// indicated by d is invertible. This function is inspired by the pseudocode in Montgomery, P. L.
+// (1995), page 116 and the implementation in msieve.
 fn max_invertible_submatrix(mut vtav: BlockMatrix, previous_d: u64) -> (u64, BlockMatrix) {
     let mut w_inv = blockmatrix![0; N];
     for i in 0..N {
@@ -38,6 +39,7 @@ fn max_invertible_submatrix(mut vtav: BlockMatrix, previous_d: u64) -> (u64, Blo
     // of d is 1.
 
     for i in 0..N {
+        // Search pivot.
         for j in i..N {
             if (vtav[c[j]] >> c[i]) & 1 == 1 {
                 vtav.swap(c[i], c[j]);
@@ -47,6 +49,7 @@ fn max_invertible_submatrix(mut vtav: BlockMatrix, previous_d: u64) -> (u64, Blo
         }
 
         if (vtav[c[i]] >> c[i]) & 1 == 1 {
+            // Pivot found.
             d |= 1 << c[i];
             for j in 0..N {
                 if i != j && (vtav[c[j]] >> c[i]) & 1 == 1 {
@@ -80,6 +83,9 @@ fn max_invertible_submatrix(mut vtav: BlockMatrix, previous_d: u64) -> (u64, Blo
     (d, w_inv)
 }
 
+// Returns the matrix [v_0T * v_(i + 1) | v_0T * p_(i + 1)] (called delta) for the (i + 1)-th
+// iteration using c, vtav w_inv and d from the i-th iteration. delta can be cheaply computed as
+// described in Bos, J. W. & Lenstra, A. K. (2017), page 185.
 fn update_delta(
     mut delta: [BlockMatrix; 2],
     c: &BlockMatrix,
@@ -106,6 +112,8 @@ fn update_delta(
     res
 }
 
+// Attempts to find a matrix x, such that a * x = a * b. Most of the time, it fails to do that, but
+// using v from the last iteration, it's still possible to find some dependencies.
 fn lanczos(a: &CscMatrix, b: &BlockMatrix) -> (BlockMatrix, BlockMatrix) {
     let n = a.len();
 
@@ -120,6 +128,8 @@ fn lanczos(a: &CscMatrix, b: &BlockMatrix) -> (BlockMatrix, BlockMatrix) {
     let mut total_d: usize = 0;
     let mut iterations: usize = 0;
 
+    // The recurrence implemented here is based on the decription of Bos, J. W & Lenstra, A. K.
+    // (2017), page 184.
     loop {
         let av = &a.transpose() * &(a * &v);
         let vtav = &v.transpose() * &av;
@@ -149,13 +159,12 @@ fn lanczos(a: &CscMatrix, b: &BlockMatrix) -> (BlockMatrix, BlockMatrix) {
         // Compute v.
         tmp = &v * &c;
         let pvtav = &p * &vtav;
-        let previous_v = v.clone();
+        let vw_inv = &v * &w_inv;
         for i in 0..n {
-            v[i] = (av[i] & d) ^ (previous_v[i] & !d) ^ tmp[i] ^ (pvtav[i] & d);
+            v[i] = (av[i] & d) ^ (v[i] & !d) ^ tmp[i] ^ (pvtav[i] & d);
         }
 
         // Compute p.
-        let vw_inv = &previous_v * &w_inv;
         for i in 0..n {
             p[i] = vw_inv[i] ^ (p[i] & !d);
         }
@@ -198,6 +207,7 @@ fn combine_columns(a: &CscMatrix, mut x: BlockMatrix, vm: BlockMatrix) -> BlockM
         let leading_bit_col: usize = leading_bit / N;
         let leading_bit_mask: u64 = (leading_bit & (N - 1)) as u64;
 
+        // Search pivot.
         for j in i..2 * N {
             if r[j][leading_bit_col] & leading_bit_mask != 0 {
                 r.swap(i, j);
@@ -206,6 +216,7 @@ fn combine_columns(a: &CscMatrix, mut x: BlockMatrix, vm: BlockMatrix) -> BlockM
             }
         }
 
+        // Eliminate pivot from other columns.
         if r[i][leading_bit_col] & leading_bit_mask != 0 {
             for j in i..2 * N {
                 if r[j][leading_bit_col] & leading_bit_mask != 0 {
@@ -229,7 +240,8 @@ fn combine_columns(a: &CscMatrix, mut x: BlockMatrix, vm: BlockMatrix) -> BlockM
     x
 }
 
-// Returns a block of vectors in the null space of a.
+// Returns a block of vectors in the null space of a. Tries different choices of the initial random
+// matrix until success.
 pub fn find_dependencies(a: &CscMatrix) -> BlockMatrix {
     let n = a.len();
     let mut xo = Xoshiro256PlusPlus::seed_from_u64(998244353);
@@ -267,17 +279,17 @@ mod tests {
     const MIN_N: usize = 100;
     const MAX_N: usize = 1000;
     const MAX_NM_DIFF: usize = 20;
-    const MAX_ONES_FRAC: usize = 5;
+    const MAX_ONES_PERCENTAGE: usize = 20;
 
     #[test]
     fn test_lanczos() {
-        let mut xo = Xoshiro256PlusPlus::seed_from_u64((1 << 61) - 7);
+        let mut xo = Xoshiro256PlusPlus::seed_from_u64((1 << 61) - 1);
 
         for _ in 0..NUM_TESTS {
             let n = (xo.next_u32() as usize % (MAX_N - MIN_N)) + MIN_N;
             let m = n - (xo.next_u32() as usize % MAX_NM_DIFF) - 1;
 
-            let a = CscMatrix::new_random(&mut xo, n, m, m / MAX_ONES_FRAC);
+            let a = CscMatrix::new_random(&mut xo, n, m, (m * MAX_ONES_PERCENTAGE) / 100);
             let x = find_dependencies(&a);
 
             let r = &a * &x;

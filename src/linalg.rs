@@ -8,6 +8,8 @@ use rand_xoshiro::Xoshiro256PlusPlus;
 
 pub const N: usize = 64;
 
+// Column-major sparse matrix storing for each column the ones' positions in a contiguous subsegment
+// in 'ones'. The index after the last element of column i is end[i].
 pub struct CscMatrix {
     pub m: usize,  // number of rows
     end: Vec<u32>, // number of columns = end.len()
@@ -18,8 +20,10 @@ pub struct CsrMatrix<'a> {
     borrowed: &'a CscMatrix,
 }
 
+// A dense binary matrix storing each row as an N-bit integer.
 #[derive(Clone)]
 pub struct BlockMatrix(Vec<u64>);
+
 pub struct TransposedBlockMatrix<'a> {
     borrowed: &'a BlockMatrix,
 }
@@ -53,6 +57,8 @@ impl CscMatrix {
         self.end.len()
     }
 
+    // Returns a view on the transposed matrix. The view is tightly bound to the original CscMatrix
+    // and is intended to be used only in composition with the '*'-Operator.
     pub fn transpose(&self) -> CsrMatrix {
         CsrMatrix { borrowed: self }
     }
@@ -75,10 +81,13 @@ impl BlockMatrix {
         self.0.swap(i, j);
     }
 
+    // Provides a lightweight view on the transposed matrix, which isn't intendend to be used
+    // standalone, but as an argument to the '*'-Operator (on any side).
     pub fn transpose(&self) -> TransposedBlockMatrix {
         TransposedBlockMatrix { borrowed: self }
     }
 
+    // Calculates the transpose explicity as a two-dimensional vector, in row-major format.
     pub fn explicit_transpose(&self) -> Vec<Vec<u64>> {
         let n_words = (self.len() + N - 1) / N;
         let mut res: Vec<Vec<u64>> = vec![vec![0; n_words]; N];
