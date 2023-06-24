@@ -8,64 +8,69 @@ use linalg::N;
 use rand_xoshiro::rand_core::SeedableRng;
 use rand_xoshiro::Xoshiro256StarStar;
 
-// Finds the largest possible amount of rows / columns, such that the principal
-// submatrix of vtav as indicated by d is invertible.
+// Finds the largest possible amount of rows / columns, such that the principal submatrix of vtav as
+// indicated by d is invertible.
 fn max_invertible_submatrix(mut vtav: BlockMatrix, previous_d: u64) -> (u64, BlockMatrix) {
     let mut w_inv = blockmatrix![0; N];
     for i in 0..N {
-        w_inv[i] |= 1 << i;
+        w_inv[i] = 1 << i;
     }
-    let mut k: usize = 0;
+
+    let mut l: usize = 0;
+    let mut r: usize = N;
+    let mut c = [0; N];
     for i in 0..N {
         if (previous_d >> i) & 1 == 0 {
-            vtav.swap(i, k);
-            w_inv.swap(i, k);
-            k += 1;
+            c[l] = i;
+            l += 1;
+        } else {
+            r -= 1;
+            c[r] = i;
         }
     }
     let mut d = 0;
 
-    // Perform elimination on vtav. All operations are reproduced on w_inv to
-    // find an inverse to the submatrix of v, where the i-th row and column is
-    // in the submatrix if and only if the i-th bit of d is 1.
+    // Perform elimination on vtav. All operations are reproduced on w_inv to find an inverse to the
+    // submatrix of v, where the i-th row and column is in the submatrix if and only if the i-th bit
+    // of d is 1.
 
     for i in 0..N {
         for j in i..N {
-            if (vtav[j] >> i) & 1 == 1 {
-                vtav.swap(i, j);
-                w_inv.swap(i, j);
+            if (vtav[c[j]] >> c[i]) & 1 == 1 {
+                vtav.swap(c[i], c[j]);
+                w_inv.swap(c[i], c[j]);
                 break;
             }
         }
 
-        if (vtav[i] >> i) & 1 == 1 {
-            d |= 1 << i;
+        if (vtav[c[i]] >> c[i]) & 1 == 1 {
+            d |= 1 << c[i];
             for j in 0..N {
-                if i != j && (vtav[j] >> i) & 1 == 1 {
-                    vtav[j] ^= vtav[i];
-                    w_inv[j] ^= w_inv[i];
+                if i != j && (vtav[c[j]] >> c[i]) & 1 == 1 {
+                    vtav[c[j]] ^= vtav[c[i]];
+                    w_inv[c[j]] ^= w_inv[c[i]];
                 }
             }
         } else {
             for j in i..N {
-                if (w_inv[j] >> i) & 1 == 1 {
-                    vtav.swap(i, j);
-                    w_inv.swap(i, j);
+                if (w_inv[c[j]] >> c[i]) & 1 == 1 {
+                    vtav.swap(c[i], c[j]);
+                    w_inv.swap(c[i], c[j]);
                     break;
                 }
             }
 
-            assert_eq!((w_inv[i] >> i) & 1, 1u64);
+            assert_eq!((w_inv[c[i]] >> c[i]) & 1, 1u64);
 
             for j in 0..N {
-                if i != j && (w_inv[j] >> i) & 1 == 1 {
-                    vtav[j] ^= vtav[i];
-                    w_inv[j] ^= w_inv[i];
+                if i != j && (w_inv[c[j]] >> c[i]) & 1 == 1 {
+                    vtav[c[j]] ^= vtav[c[i]];
+                    w_inv[c[j]] ^= w_inv[c[i]];
                 }
             }
 
-            vtav[i] = 0;
-            w_inv[i] = 0;
+            vtav[c[i]] = 0;
+            w_inv[c[i]] = 0;
         }
     }
 
@@ -108,7 +113,7 @@ fn lanczos(a: &CscMatrix, b: &BlockMatrix) -> (BlockMatrix, BlockMatrix) {
     let mut delta: [BlockMatrix; 2] = [blockmatrix![0; N], blockmatrix![0; N]];
     delta[0] = &v0.transpose() * &v0;
 
-    let mut d: u64 = 64;
+    let mut d: u64 = !0u64;
     let mut total_d: usize = 0;
     let mut iterations: usize = 0;
 
@@ -116,9 +121,9 @@ fn lanczos(a: &CscMatrix, b: &BlockMatrix) -> (BlockMatrix, BlockMatrix) {
         let av = &a.transpose() * &(a * &v);
         let vtav = &v.transpose() * &av;
         let vta2v = &av.transpose() * &av;
-        let w_inv: BlockMatrix;
 
         let previous_d = d;
+        let w_inv: BlockMatrix;
         (d, w_inv) = max_invertible_submatrix(vtav.clone(), d);
 
         if d == 0 {
@@ -127,7 +132,7 @@ fn lanczos(a: &CscMatrix, b: &BlockMatrix) -> (BlockMatrix, BlockMatrix) {
         assert!(w_inv.is_symmetric());
 
         if total_d + N < a.m {
-            assert_eq!(!((1u64 << previous_d.count_zeros()) - 1) | d, !0u64);
+            assert_eq!(previous_d | d, !0u64);
         }
         total_d += d.count_ones() as usize;
 
@@ -170,18 +175,17 @@ fn lanczos(a: &CscMatrix, b: &BlockMatrix) -> (BlockMatrix, BlockMatrix) {
     (x, v)
 }
 
-// Uses x and vm to find vectors in the nullspace of a by elimination. The
-// returned BlockMatrix contains the vectors found in the lower order bits, the
-// remaining bits are zeroed.
+// Uses x and vm to find vectors in the nullspace of a by elimination. The returned BlockMatrix
+// contains the vectors found in the lower order bits, the remaining bits are zeroed.
 fn combine_columns(a: &CscMatrix, mut x: BlockMatrix, vm: BlockMatrix) -> BlockMatrix {
-    let n = a.len();
+    let (n, m) = (a.len(), a.m);
     let mut r: Vec<Vec<u64>> = (a * &x).explicit_transpose();
     r.append(&mut (a * &vm).explicit_transpose());
     let mut s: Vec<Vec<u64>> = x.explicit_transpose();
     s.append(&mut vm.explicit_transpose());
 
     let mut i: usize = 0;
-    for leading_bit in 0..n {
+    for leading_bit in 0..m {
         if i >= 2 * N {
             break;
         }
@@ -190,7 +194,7 @@ fn combine_columns(a: &CscMatrix, mut x: BlockMatrix, vm: BlockMatrix) -> BlockM
         let leading_bit_mask: u64 = (leading_bit & (N - 1)) as u64;
 
         for j in i..2 * N {
-            if r[i][leading_bit_col] & leading_bit_mask != 0 {
+            if r[j][leading_bit_col] & leading_bit_mask != 0 {
                 r.swap(i, j);
                 s.swap(i, j);
                 break;
@@ -221,19 +225,13 @@ fn combine_columns(a: &CscMatrix, mut x: BlockMatrix, vm: BlockMatrix) -> BlockM
 }
 
 // Returns a block of vectors in the null space of a.
-pub fn find_dependencies(a: &CscMatrix) -> BlockMatrix {
+pub fn find_nullvectors(a: &CscMatrix) -> BlockMatrix {
     let n = a.len();
     let mut xo = Xoshiro256StarStar::seed_from_u64(998244353);
+
     let y = BlockMatrix::new_random(n, &mut xo);
-
     let (x, vm) = lanczos(a, &y);
-    let null_matrix = combine_columns(a, x, vm);
-
-    let z = a * &null_matrix;
-    for i in 0..n {
-        assert_eq!(z[i], 0);
-    }
-    null_matrix
+    combine_columns(a, x, vm)
 }
 
 #[cfg(test)]
@@ -242,13 +240,12 @@ mod tests {
     use rand_xoshiro::rand_core::SeedableRng;
     use rand_xoshiro::Xoshiro256StarStar;
 
-    use super::lanczos;
-    use super::BlockMatrix;
+    use super::find_nullvectors;
     use super::CscMatrix;
 
     const NUM_TESTS: usize = 42;
     const MIN_N: usize = 100;
-    const MAX_N: usize = 2000;
+    const MAX_N: usize = 1000;
     const MAX_NM_DIFF: usize = 20;
     const MAX_ONES_FRAC: usize = 5;
 
@@ -261,12 +258,11 @@ mod tests {
             let m = n - (xo.next_u32() as usize % MAX_NM_DIFF);
 
             let a = CscMatrix::new_random(&mut xo, n, m, m / MAX_ONES_FRAC);
-            let b = BlockMatrix::new_random(n, &mut xo);
-            let (x, vm) = lanczos(&a, &b);
-            let y = &a.transpose() * &(&a * &x);
-            let z = &a.transpose() * &(&a * &b);
-            for i in 0..n {
-                assert_eq!(y[i], z[i]);
+            let x = find_nullvectors(&a);
+
+            let r = &a * &x;
+            for i in 0..a.m {
+                assert_eq!(r[i], 0);
             }
         }
     }

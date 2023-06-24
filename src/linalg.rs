@@ -80,7 +80,7 @@ impl BlockMatrix {
     }
 
     pub fn explicit_transpose(&self) -> Vec<Vec<u64>> {
-        let n_words = (self.len() + N) / N;
+        let n_words = (self.len() + N - 1) / N;
         let mut res: Vec<Vec<u64>> = vec![vec![0; n_words]; N];
 
         for i in 0..self.len() {
