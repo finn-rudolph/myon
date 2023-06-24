@@ -27,7 +27,7 @@ fn max_invertible_submatrix(mut vtav: BlockMatrix) -> (u64, BlockMatrix) {
         }
 
         if (vtav[i] >> i) & 1 == 1 {
-            d |= 1u64 << i;
+            d |= 1 << i;
             for j in 0..N {
                 if i != j && (vtav[j] >> i) & 1 == 1 {
                     vtav[j] ^= vtav[i];
@@ -64,29 +64,23 @@ fn update_gamma(
     mut gamma: [BlockMatrix; 2],
     c: &BlockMatrix,
     vtav: &BlockMatrix,
-    w_inv: BlockMatrix,
+    w_inv: &BlockMatrix,
     d: u64,
 ) -> [BlockMatrix; 2] {
     let mut res: [BlockMatrix; 2] = [blockmatrix![0; N], blockmatrix![0; N]];
-    let mut delta: [[BlockMatrix; 2]; 2] = [
-        [blockmatrix![0; N], blockmatrix![0; N]],
-        [blockmatrix![0; N], blockmatrix![0; N]],
-    ];
+
+    let mut r = blockmatrix![0; N];
     for i in 0..N {
-        delta[0][0][i] = c[i] ^ ((1u64 << i) & d);
-        delta[1][0][i] = vtav[i] & d;
-        delta[1][1][i] = d & (1u64 << i);
+        r[i] = c[i] ^ ((1u64 << i) & !d);
     }
-    delta[0][1] = w_inv;
 
-    res[0] = &gamma[0] * &delta[0][0];
-    res[1] = &gamma[0] * &delta[0][1];
-    gamma[0] = &gamma[1] * &delta[1][0];
-    gamma[1] = &gamma[1] * &delta[1][1];
+    res[0] = &gamma[0] * &r;
+    res[1] = &gamma[0] * w_inv;
+    gamma[0] = &gamma[1] * vtav;
 
     for i in 0..N {
-        res[0][i] ^= gamma[0][i];
-        res[1][i] ^= gamma[1][i];
+        res[0][i] ^= gamma[0][i] & d;
+        res[1][i] ^= gamma[1][i] & !d;
     }
 
     res
@@ -132,17 +126,18 @@ pub fn lanczos(a: &CscMatrix, b: &BlockMatrix) -> BlockMatrix {
             x[i] ^= tmp[i];
         }
 
-        gamma = update_gamma(gamma, &c, &vtav, w_inv.clone(), d);
+        gamma = update_gamma(gamma, &c, &vtav, &w_inv, d);
 
         // Compute new v.
 
         tmp = &v * &c;
         let pvtav = &p * &vtav;
+        let ov = v.clone();
         for i in 0..n {
-            v[i] = (av[i] & d) ^ (v[i] & !d) ^ tmp[i] ^ (pvtav[i] & d);
+            v[i] = (av[i] & d) ^ (ov[i] & !d) ^ tmp[i] ^ (pvtav[i] & d);
         }
 
-        let vw_inv = &v * &w_inv;
+        let vw_inv = &ov * &w_inv;
         for i in 0..n {
             p[i] = vw_inv[i] ^ (p[i] & !d);
         }
