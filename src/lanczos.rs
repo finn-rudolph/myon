@@ -6,10 +6,20 @@ use linalg::BlockMatrix;
 use linalg::CscMatrix;
 use linalg::N;
 
-fn max_invertible_submatrix(mut vtav: BlockMatrix) -> (u64, BlockMatrix) {
+// Finds the largest possible amount of rows / columns, such that the principal
+// submatrix of vtav as indicated by d is invertible.
+fn max_invertible_submatrix(mut vtav: BlockMatrix, previous_d: u64) -> (u64, BlockMatrix) {
     let mut w_inv = blockmatrix![0; N];
     for i in 0..N {
         w_inv[i] |= 1 << i;
+    }
+    let mut k: usize = 0;
+    for i in 0..N {
+        if (previous_d >> i) & 1 == 0 {
+            vtav.swap(i, k);
+            w_inv.swap(i, k);
+            k += 1;
+        }
     }
     let mut d = 0;
 
@@ -97,7 +107,9 @@ pub fn lanczos(a: &CscMatrix, b: &BlockMatrix) -> BlockMatrix {
     let mut gamma: [BlockMatrix; 2] = [blockmatrix![0; N], blockmatrix![0; N]];
     gamma[0] = &v.transpose() * &v;
 
-    let mut d: u64;
+    let mut d: u64 = 64;
+    let mut total_d: usize = 0;
+    let mut iterations: usize = 0;
 
     loop {
         let av = &a.transpose() * &(a * &v);
@@ -105,12 +117,18 @@ pub fn lanczos(a: &CscMatrix, b: &BlockMatrix) -> BlockMatrix {
         let vta2v = &av.transpose() * &av;
         let w_inv: BlockMatrix;
 
-        (d, w_inv) = max_invertible_submatrix(vtav.clone());
+        let previous_d = d;
+        (d, w_inv) = max_invertible_submatrix(vtav.clone(), d);
 
         if d == 0 {
             break;
         }
         assert!(w_inv.is_symmetric());
+
+        if total_d + N < a.m {
+            assert_eq!(!((1u64 << previous_d.count_zeros()) - 1) | d, !0u64);
+        }
+        total_d += d.count_ones() as usize;
 
         let mut tmp = blockmatrix![0; N];
         for i in 0..N {
@@ -118,29 +136,34 @@ pub fn lanczos(a: &CscMatrix, b: &BlockMatrix) -> BlockMatrix {
         }
         let c = &w_inv * &tmp;
 
-        // Compute new gamma and update x.
-
-        tmp = &w_inv * &gamma[0].transpose();
-        tmp = &v * &tmp;
-        for i in 0..n {
-            x[i] ^= tmp[i];
-        }
-
-        gamma = update_gamma(gamma, &c, &vtav, &w_inv, d);
-
         // Compute new v.
 
         tmp = &v * &c;
         let pvtav = &p * &vtav;
-        let ov = v.clone();
+        let previous_v = v.clone();
         for i in 0..n {
-            v[i] = (av[i] & d) ^ (ov[i] & !d) ^ tmp[i] ^ (pvtav[i] & d);
+            v[i] = (av[i] & d) ^ (previous_v[i] & !d) ^ tmp[i] ^ (pvtav[i] & d);
         }
 
-        let vw_inv = &ov * &w_inv;
+        let vw_inv = &previous_v * &w_inv;
         for i in 0..n {
             p[i] = vw_inv[i] ^ (p[i] & !d);
         }
+
+        // Compute new gamma and update x.
+
+        tmp = &vw_inv * &gamma[0].transpose();
+        for i in 0..n {
+            x[i] ^= tmp[i];
+        }
+        if iterations != 0 {
+            gamma = update_gamma(gamma, &c, &vtav, &w_inv, d);
+        } else {
+            gamma[0] = &b.transpose() * &v;
+            gamma[1] = &b.transpose() * &p;
+        }
+
+        iterations += 1;
     }
 
     x
@@ -148,47 +171,51 @@ pub fn lanczos(a: &CscMatrix, b: &BlockMatrix) -> BlockMatrix {
 
 #[cfg(test)]
 mod tests {
-    use rand::{thread_rng, Rng};
+    use rand_xoshiro::rand_core::RngCore;
+    use rand_xoshiro::rand_core::SeedableRng;
+    use rand_xoshiro::Xoshiro256StarStar;
 
     use super::blockmatrix;
     use super::lanczos;
     use super::BlockMatrix;
     use super::CscMatrix;
 
-    fn random_sparse_matrix(n: usize, m: usize, avg_ones: usize) -> CscMatrix {
+    fn random_sparse_matrix(xo: &mut Xoshiro256StarStar, n: usize, m: usize) -> CscMatrix {
         let mut end: Vec<u32> = vec![0; 0];
         let mut ones: Vec<u32> = vec![0; 0];
+        let avg_ones = m / 5 + (xo.next_u32() as usize % (m / 5 - m / 40));
 
         for _ in 0..n {
-            let weight = thread_rng().gen_range(0..(avg_ones << 1));
+            let weight = xo.next_u32() as usize % std::cmp::min(m, avg_ones << 1);
             for _ in 0..weight {
-                ones.push(thread_rng().gen_range(0..m) as u32);
+                ones.push(xo.next_u32() % m as u32);
             }
             end.push(ones.len() as u32);
         }
 
-        CscMatrix::new(end, ones)
+        CscMatrix::new(m, end, ones)
     }
 
-    fn random_block_matrix(n: usize) -> BlockMatrix {
+    fn random_block_matrix(xo: &mut Xoshiro256StarStar, n: usize) -> BlockMatrix {
         let mut a = blockmatrix![0; n];
         for i in 0..n {
-            a[i] = thread_rng().gen::<u64>();
+            a[i] = xo.next_u64();
         }
         a
     }
 
     #[test]
     fn test_lanczos() {
-        for _ in 0..42 {
-            let n = thread_rng().gen_range(100..2000);
-            let m = thread_rng().gen_range(n - 20..n);
-            let avg_ones = thread_rng().gen_range(m / 40..m / 5);
+        let mut xo = Xoshiro256StarStar::seed_from_u64((1 << 42) - 42);
 
-            let a = random_sparse_matrix(n, m, avg_ones);
-            let b = random_block_matrix(n);
+        for _ in 0..42 {
+            let n = (xo.next_u32() as usize % 1900) + 100;
+            let m = n - (xo.next_u32() as usize % 20);
+
+            let a = random_sparse_matrix(&mut xo, n, m);
+            let b = random_block_matrix(&mut xo, n);
             let x = lanczos(&a, &b);
-            let y = &a * &x;
+            let y = &a.transpose() * &(&a * &x);
             for i in 0..n {
                 assert_eq!(y[i], b[i]);
             }

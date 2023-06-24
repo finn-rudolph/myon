@@ -6,7 +6,7 @@ use std::ops::Mul;
 pub const N: usize = 64;
 
 pub struct CscMatrix {
-    m: usize,      // number of rows
+    pub m: usize,  // number of rows
     end: Vec<u32>, // number of columns = end.len()
     ones: Vec<u32>,
 }
