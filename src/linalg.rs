@@ -5,18 +5,18 @@ use rand_xoshiro::{rand_core::RngCore, Xoshiro256PlusPlus};
 
 pub const N: usize = 64;
 
-macro_rules! blockmatrix {
+macro_rules! block_matrix {
     ( $x:expr; $n:expr ) => {
         BlockMatrix::from(vec![$x; $n])
     };
 }
 
-pub(crate) use blockmatrix;
+pub(crate) use block_matrix;
 
 // Column-major sparse matrix storing for each column the ones' positions in a contiguous subsegment
 // in 'ones'. The index after the last element of column i is end[i].
 pub struct CscMatrix {
-    m: usize,      // number of rows
+    num_rows: usize,
     end: Vec<u32>, // number of columns = end.len()
     ones: Vec<u32>,
 }
@@ -34,8 +34,12 @@ pub struct BlockMatrixTranspose<'a> {
 }
 
 impl CscMatrix {
-    pub fn new(m: usize, end: Vec<u32>, ones: Vec<u32>) -> CscMatrix {
-        CscMatrix { m, end, ones }
+    pub fn new(num_rows: usize, end: Vec<u32>, ones: Vec<u32>) -> CscMatrix {
+        CscMatrix {
+            num_rows,
+            end,
+            ones,
+        }
     }
 
     pub fn new_random(
@@ -63,7 +67,7 @@ impl CscMatrix {
     }
 
     pub fn num_rows(&self) -> usize {
-        self.m
+        self.num_rows
     }
 
     // Returns a view on the transposed matrix. The view is tightly bound to the original CscMatrix
@@ -75,7 +79,7 @@ impl CscMatrix {
 
 impl BlockMatrix {
     pub fn new_random(n: usize, xo: &mut Xoshiro256PlusPlus) -> BlockMatrix {
-        let mut a = blockmatrix![0; n];
+        let mut a = block_matrix![0; n];
         for i in 0..n {
             a[i] = xo.next_u64();
         }
@@ -147,9 +151,9 @@ impl Mul<&BlockMatrix> for &CscMatrix {
     type Output = BlockMatrix;
 
     fn mul(self, b: &BlockMatrix) -> BlockMatrix {
-        let (n, m) = (self.end.len(), self.m);
+        let (n, m) = (self.num_cols(), self.num_rows());
         assert_eq!(n, b.len());
-        let mut res = blockmatrix![0; m];
+        let mut res = block_matrix![0; m];
 
         let mut j: usize = 0;
         for i in 0..n {
@@ -167,9 +171,9 @@ impl<'a> Mul<&BlockMatrix> for &CscMatrixTranspose<'a> {
     type Output = BlockMatrix;
 
     fn mul(self, b: &BlockMatrix) -> BlockMatrix {
-        let (n, m) = (self.borrowed.end.len(), self.borrowed.m);
+        let (n, m) = (self.borrowed.num_cols(), self.borrowed.num_rows());
         assert_eq!(m, b.len());
-        let mut res = blockmatrix![0; n];
+        let mut res = block_matrix![0; n];
 
         let mut j: usize = 0;
         for i in 0..n {
@@ -189,7 +193,7 @@ impl Mul<&BlockMatrix> for &BlockMatrix {
     fn mul(self, b: &BlockMatrix) -> BlockMatrix {
         assert_eq!(N, b.len());
         let n = self.len();
-        let mut res = blockmatrix![0; n];
+        let mut res = block_matrix![0; n];
 
         for i in 0..n {
             let mut x = self[i];
@@ -214,7 +218,7 @@ impl<'a> Mul<&BlockMatrixTranspose<'a>> for &BlockMatrix {
         let n = self.len();
         assert!(n >= N);
         assert_eq!(N, b.borrowed.len());
-        let mut res = blockmatrix![0; n];
+        let mut res = block_matrix![0; n];
 
         for i in 0..n {
             for j in 0..N {
@@ -232,7 +236,7 @@ impl<'a> Mul<&BlockMatrix> for &BlockMatrixTranspose<'a> {
     fn mul(self, b: &BlockMatrix) -> BlockMatrix {
         let n = self.borrowed.len();
         assert_eq!(b.len(), n);
-        let mut res = blockmatrix![0; N];
+        let mut res = block_matrix![0; N];
 
         for i in 0..n {
             let mut x = self.borrowed[i];

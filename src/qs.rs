@@ -1,11 +1,11 @@
 use rug::{ops::CompleteRound, Float, Integer};
 
-fn get_smoothness_bound(n: &Integer) -> usize {
+fn smoothness_bound(n: &Integer) -> usize {
     let l = Float::parse(n.to_string()).unwrap().complete(512).ln();
     return Float::exp(0.5 * l.clone().sqrt() * l.ln().sqrt()).to_f64() as usize;
 }
 
-fn get_factor_base(n: &Integer, smoothness_bound: usize) -> Vec<u64> {
+fn factor_base(n: &Integer, smoothness_bound: usize) -> Vec<u64> {
     let mut is_prime: Vec<bool> = vec![1 != 0; smoothness_bound + 1];
     let mut factor_base: Vec<u64> = vec![0; 0];
 
@@ -31,8 +31,8 @@ fn get_sieve_interval_len(smoothness_bound: usize) -> usize {
 }
 
 pub fn factorize(n: &Integer) -> (Integer, Integer) {
-    let smoothness_bound = get_smoothness_bound(&n);
-    let factor_base = get_factor_base(&n, smoothness_bound);
+    let smoothness_bound = smoothness_bound(&n);
+    let factor_base = factor_base(&n, smoothness_bound);
 
     // IDEA: use SIMD gather to increment a bunch of sieve values at once? Probably not helpful
     // since memory is the limit anyway, but try it.

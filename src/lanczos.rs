@@ -2,7 +2,7 @@ use std::io::{self, Write};
 
 use rand_xoshiro::{rand_core::SeedableRng, Xoshiro256PlusPlus};
 
-use crate::linalg::{blockmatrix, BlockMatrix, CscMatrix, N};
+use crate::linalg::{block_matrix, BlockMatrix, CscMatrix, N};
 
 // TODO: add bitmask macro / function / table
 
@@ -10,7 +10,7 @@ use crate::linalg::{blockmatrix, BlockMatrix, CscMatrix, N};
 // indicated by d is invertible. This function is inspired by the pseudocode in Montgomery, P. L.
 // (1995), page 116 and the implementation in msieve.
 fn max_invertible_submatrix(mut vtav: BlockMatrix, previous_d: u64) -> (u64, BlockMatrix) {
-    let mut w_inv = blockmatrix![0; N];
+    let mut w_inv = block_matrix![0; N];
     for i in 0..N {
         w_inv[i] = 1 << i;
     }
@@ -88,9 +88,9 @@ fn update_delta(
     w_inv: &BlockMatrix,
     d: u64,
 ) -> [BlockMatrix; 2] {
-    let mut res: [BlockMatrix; 2] = [blockmatrix![0; N], blockmatrix![0; N]];
+    let mut res: [BlockMatrix; 2] = [block_matrix![0; N], block_matrix![0; N]];
 
-    let mut r = blockmatrix![0; N];
+    let mut r = block_matrix![0; N];
     for i in 0..N {
         r[i] = c[i] ^ ((1u64 << i) & !d);
     }
@@ -114,9 +114,9 @@ fn lanczos(a: &CscMatrix, b: &BlockMatrix) -> (BlockMatrix, BlockMatrix) {
 
     let v0 = &a.transpose() * &(a * b);
     let mut v = v0.clone();
-    let mut p = blockmatrix![0; n];
+    let mut p = block_matrix![0; n];
     let mut x = b.clone();
-    let mut delta: [BlockMatrix; 2] = [blockmatrix![0; N], blockmatrix![0; N]];
+    let mut delta: [BlockMatrix; 2] = [block_matrix![0; N], block_matrix![0; N]];
     delta[0] = &v0.transpose() * &v0;
 
     let mut d: u64 = !0u64;
@@ -145,7 +145,7 @@ fn lanczos(a: &CscMatrix, b: &BlockMatrix) -> (BlockMatrix, BlockMatrix) {
         total_d += d.count_ones() as usize;
 
         // Compute c.
-        let mut tmp = blockmatrix![0; N];
+        let mut tmp = block_matrix![0; N];
         for i in 0..N {
             tmp[i] = (vta2v[i] & d) ^ (vtav[i] & !d);
         }
@@ -264,10 +264,7 @@ pub fn find_dependencies(a: &CscMatrix) -> BlockMatrix {
 
 #[cfg(test)]
 mod tests {
-    use rand_xoshiro::rand_core::SeedableRng;
-    use rand_xoshiro::Xoshiro256PlusPlus;
-
-    use super::CscMatrix;
+    use super::*;
 
     #[test]
     fn test_lanczos() {
