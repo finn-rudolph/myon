@@ -1,5 +1,41 @@
 use rand_xoshiro::{rand_core::RngCore, Xoshiro256PlusPlus};
 
+// TODO: make this module generic
+
+struct Montgomery {
+    n: u32,
+    r: u32,
+}
+
+impl Montgomery {
+    fn new(n: u32) -> Montgomery {
+        let mut mtg = Montgomery { n, r: 1 };
+        for i in 0..5 {
+            mtg.r *= 2 - n * mtg.r;
+        }
+        mtg
+    }
+
+    fn reduce(&self, a: u64) -> u32 {
+        let q: u64 = (a as u32).wrapping_mul(self.r) as u64;
+        let m = q * (self.n as u64) >> 32;
+        let x: u32 = ((a >> 32) + self.n as u64 - m) as u32;
+        if x >= self.n {
+            x - self.n
+        } else {
+            x
+        }
+    }
+
+    fn multiply(&self, a: u32, b: u32) -> u32 {
+        self.reduce(a as u64 * b as u64)
+    }
+
+    fn transform(&self, a: u32) -> u32 {
+        (((a as u64) << 32) % (self.n as u64)) as u32
+    }
+}
+
 fn mod_exp(mut a: u64, mut b: u64, m: u64) -> u64 {
     let mut c: u64 = 1;
 
@@ -60,3 +96,5 @@ pub fn tonelli_shanks(mut a: u64, p: u64, xo: &mut Xoshiro256PlusPlus) -> u64 {
 
     (mod_exp(a, (m + 1) >> 1, p) * correction) % p
 }
+
+// TODO: Add Cipolla's algorithm (it shall be faster sometimes?)
