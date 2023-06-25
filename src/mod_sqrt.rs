@@ -62,7 +62,7 @@ const fn mod_inverse(a: u64, m: u64) -> u64 {
 
 // Finds a square root of a modulo p using the Tonelli-Shanks algorithm. a and p may not be greater
 // than u32::MAX, since multiplication is performed with them.
-pub fn tonelli_shanks(mut a: u64, p: u64, xo: &mut Xoshiro256PlusPlus) -> u64 {
+pub fn mod_sqrt(mut a: u64, p: u64, xo: &mut Xoshiro256PlusPlus) -> u64 {
     assert!(a <= u32::MAX as u64);
     assert!(p <= u32::MAX as u64);
 
@@ -100,3 +100,61 @@ pub fn tonelli_shanks(mut a: u64, p: u64, xo: &mut Xoshiro256PlusPlus) -> u64 {
 }
 
 // TODO: Add Cipolla's algorithm (it shall be faster sometimes?)
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand_xoshiro::{rand_core::SeedableRng, Xoshiro256PlusPlus};
+
+    // Returns true, if (and only if? I'm not sure.) n is a prime. Works for numbers less than
+    // u32::MAX.
+    fn is_prime(n: u64) -> bool {
+        assert!(n <= u32::MAX as u64);
+
+        const MILLER_RABIN_BASES: [u64; 3] = [15, 7363882082, 992620450144556];
+
+        let trailing_zeros = (n - 1).trailing_zeros();
+        let u = (n - 1) >> trailing_zeros;
+
+        for mut a in MILLER_RABIN_BASES {
+            a = a % n;
+            let mut x = mod_exp(a, u, n);
+            for _ in 0..trailing_zeros {
+                let y = (x * x) % n;
+                if y == 1 && x != 1 && x != n - 1 {
+                    return false;
+                }
+                x = y;
+            }
+            if x != 1 {
+                return false;
+            }
+        }
+        true
+    }
+
+    // TODO: find better algorithm
+    fn gen_prime(xo: &mut Xoshiro256PlusPlus) -> u32 {
+        loop {
+            let p = xo.next_u32();
+            if is_prime(p as u64) {
+                return p;
+            }
+        }
+    }
+
+    #[test]
+    fn test_tonelli_shanks() {
+        let mut xo = Xoshiro256PlusPlus::seed_from_u64(1000000009);
+
+        for _ in 0..10000 {
+            let p = gen_prime(&mut xo);
+            let mut a = xo.next_u32() % p;
+            while legendre(a as u64, p as u64) != 1 {
+                a = xo.next_u32() % p;
+            }
+            let x = mod_sqrt(a as u64, p as u64, &mut xo);
+            assert_eq!((x * x) % p as u64, a as u64);
+        }
+    }
+}
