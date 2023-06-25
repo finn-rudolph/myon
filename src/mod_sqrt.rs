@@ -8,15 +8,17 @@ struct Montgomery {
 }
 
 impl Montgomery {
-    fn new(n: u32) -> Montgomery {
+    const fn new(n: u32) -> Montgomery {
         let mut mtg = Montgomery { n, r: 1 };
-        for i in 0..5 {
+        let mut i = 0;
+        while i < 5 {
             mtg.r *= 2 - n * mtg.r;
+            i += 1;
         }
         mtg
     }
 
-    fn reduce(&self, a: u64) -> u32 {
+    const fn reduce(&self, a: u64) -> u32 {
         let q: u64 = (a as u32).wrapping_mul(self.r) as u64;
         let m = q * (self.n as u64) >> 32;
         let x: u32 = ((a >> 32) + self.n as u64 - m) as u32;
@@ -27,16 +29,16 @@ impl Montgomery {
         }
     }
 
-    fn multiply(&self, a: u32, b: u32) -> u32 {
+    const fn multiply(&self, a: u32, b: u32) -> u32 {
         self.reduce(a as u64 * b as u64)
     }
 
-    fn transform(&self, a: u32) -> u32 {
+    const fn transform(&self, a: u32) -> u32 {
         (((a as u64) << 32) % (self.n as u64)) as u32
     }
 }
 
-fn mod_exp(mut a: u64, mut b: u64, m: u64) -> u64 {
+const fn mod_exp(mut a: u64, mut b: u64, m: u64) -> u64 {
     let mut c: u64 = 1;
 
     while b != 0 {
@@ -50,11 +52,11 @@ fn mod_exp(mut a: u64, mut b: u64, m: u64) -> u64 {
     c
 }
 
-fn legendre(a: u64, p: u64) -> u64 {
+const fn legendre(a: u64, p: u64) -> u64 {
     mod_exp(a, (p - 1) >> 1, p)
 }
 
-fn mod_inverse(a: u64, m: u64) -> u64 {
+const fn mod_inverse(a: u64, m: u64) -> u64 {
     mod_exp(a, m - 2, m)
 }
 
