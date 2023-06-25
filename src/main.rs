@@ -1,7 +1,10 @@
 use rug::{Complete, Integer};
 use std::io;
 
-pub mod qs;
+mod lanczos;
+mod linalg;
+mod mod_sqrt;
+mod qs;
 
 fn main() {
     let stdin = io::stdin();

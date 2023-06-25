@@ -1,16 +1,10 @@
-#[path = "linalg.rs"]
-mod linalg;
+use std::io::{self, Write};
 
-use std::io;
-use std::io::Write;
+use rand_xoshiro::{rand_core::SeedableRng, Xoshiro256PlusPlus};
 
-use rand_xoshiro::rand_core::SeedableRng;
-use rand_xoshiro::Xoshiro256PlusPlus;
+use crate::linalg::{blockmatrix, BlockMatrix, CscMatrix, N};
 
-use linalg::blockmatrix;
-use linalg::BlockMatrix;
-use linalg::CscMatrix;
-use linalg::N;
+// TODO: add bitmask macro / function / table
 
 // Finds the largest possible amount of rows / columns, such that the principal submatrix of vtav as
 // indicated by d is invertible. This function is inspired by the pseudocode in Montgomery, P. L.
@@ -273,7 +267,6 @@ mod tests {
     use rand_xoshiro::rand_core::SeedableRng;
     use rand_xoshiro::Xoshiro256PlusPlus;
 
-    use super::find_dependencies;
     use super::CscMatrix;
 
     #[test]
@@ -284,7 +277,7 @@ mod tests {
             let n = 196 + i * 71;
             let m = n - 19;
             let a = CscMatrix::new_random(&mut xo, n, m, 11);
-            let x = find_dependencies(&a);
+            let x = super::find_dependencies(&a);
 
             let r = &a * &x;
             for i in 0..m {

@@ -24,7 +24,7 @@ fn mod_inverse(a: u64, m: u64) -> u64 {
 
 // Finds a square root of a modulo p using the Tonelli-Shanks algorithm. a and p may not be greater
 // than u32::MAX, since multiplication is performed with them.
-pub fn mod_sqrt(mut a: u64, p: u64, xo: &mut Xoshiro256PlusPlus) -> u64 {
+pub fn tonelli_shanks(mut a: u64, p: u64, xo: &mut Xoshiro256PlusPlus) -> u64 {
     assert!(a <= u32::MAX as u64);
     assert!(p <= u32::MAX as u64);
 

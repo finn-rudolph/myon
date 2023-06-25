@@ -1,10 +1,7 @@
 use std::convert::From;
-use std::ops::Index;
-use std::ops::IndexMut;
-use std::ops::Mul;
+use std::ops::{Index, IndexMut, Mul};
 
-use rand_xoshiro::rand_core::RngCore;
-use rand_xoshiro::Xoshiro256PlusPlus;
+use rand_xoshiro::{rand_core::RngCore, Xoshiro256PlusPlus};
 
 pub const N: usize = 64;
 
