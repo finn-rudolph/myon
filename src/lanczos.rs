@@ -116,8 +116,7 @@ fn lanczos(a: &CscMatrix, b: &BlockMatrix) -> (BlockMatrix, BlockMatrix) {
     let mut v = v0.clone();
     let mut p = block_matrix![0; n];
     let mut x = b.clone();
-    let mut delta: [BlockMatrix; 2] = [block_matrix![0; N], block_matrix![0; N]];
-    delta[0] = &v0.transpose() * &v0;
+    let mut delta: [BlockMatrix; 2] = [&v0.transpose() * &v0, block_matrix![0; N]];
 
     let mut d: u64 = !0u64;
     let mut total_d: usize = 0;
@@ -235,11 +234,17 @@ fn combine_columns(a: &CscMatrix, mut x: BlockMatrix, vm: BlockMatrix) -> BlockM
     x
 }
 
-// Returns a block of vectors in the null space of a. Tries different choices of the initial random
-// matrix until success.
+// Returns a block of vectors in the nullspace of a.
 pub fn find_dependencies(a: &CscMatrix) -> BlockMatrix {
     let n = a.num_cols();
     let mut xo = Xoshiro256PlusPlus::seed_from_u64(998244353);
+
+    eprintln!(
+        "Solving linear system with {} rows and {} columns.",
+        a.num_rows(),
+        a.num_cols()
+    );
+    let _ = io::stdout().flush();
 
     loop {
         let (x, vm) = lanczos(a, &BlockMatrix::new_random(n, &mut xo));
@@ -251,7 +256,7 @@ pub fn find_dependencies(a: &CscMatrix) -> BlockMatrix {
 
         if u != 0 {
             eprintln!(
-                "Found {} nontrivial vectors in the nullspace of A.",
+                "Found {} nontrivial vectors in the nullspace.",
                 u.count_ones()
             );
             let _ = io::stdout().flush();
@@ -271,10 +276,10 @@ mod tests {
         let mut xo = Xoshiro256PlusPlus::seed_from_u64((1 << 61) - 1);
 
         for i in 0..11 {
-            let n = 196 + i * 71;
-            let m = n - 19;
-            let a = CscMatrix::new_random(&mut xo, n, m, 11);
-            let x = super::find_dependencies(&a);
+            let n: usize = 197 + 69 * i;
+            let m: usize = n - 19;
+            let a = CscMatrix::new_random(n, m, 17, &mut xo);
+            let x = find_dependencies(&a);
 
             let r = &a * &x;
             for i in 0..m {

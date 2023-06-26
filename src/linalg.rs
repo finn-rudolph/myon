@@ -43,23 +43,32 @@ impl CscMatrix {
     }
 
     pub fn new_random(
-        xo: &mut Xoshiro256PlusPlus,
-        n: usize,
-        m: usize,
+        num_cols: usize,
+        num_rows: usize,
         max_ones: usize,
+        xo: &mut Xoshiro256PlusPlus,
     ) -> CscMatrix {
         let mut end: Vec<u32> = vec![0; 0];
         let mut ones: Vec<u32> = vec![0; 0];
+        let mut used: Vec<bool> = vec![0 != 0; num_rows];
 
-        for _ in 0..n {
+        for _ in 0..num_cols {
             let weight = xo.next_u32() as usize % max_ones;
             for _ in 0..weight {
-                ones.push(xo.next_u32() % m as u32);
+                let mut x = xo.next_u32() % num_rows as u32;
+                while used[x as usize] {
+                    x = xo.next_u32() % num_rows as u32;
+                }
+                ones.push(x);
+                used[x as usize] = true;
             }
             end.push(ones.len() as u32);
+            for i in 0..weight {
+                used[ones[ones.len() - i - 1] as usize] = false;
+            }
         }
 
-        CscMatrix::new(m, end, ones)
+        CscMatrix::new(num_rows, end, ones)
     }
 
     pub fn num_cols(&self) -> usize {
