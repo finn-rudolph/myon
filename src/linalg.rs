@@ -34,12 +34,18 @@ pub struct BlockMatrixTranspose<'a> {
 }
 
 impl CscMatrix {
-    pub fn new(num_rows: usize, end: Vec<u32>, ones: Vec<u32>) -> CscMatrix {
-        CscMatrix {
+    // Builds a CscMatrix, given for each column a Vec containing the numbers of rows with a 1.
+    pub fn new(ones_positions: &Vec<Vec<u32>>, num_rows: usize) -> CscMatrix {
+        let mut a = CscMatrix {
             num_rows,
-            end,
-            ones,
+            end: vec![],
+            ones: vec![],
+        };
+        for col in ones_positions {
+            a.ones.append(&mut col.clone());
+            a.end.push(a.ones.len() as u32);
         }
+        a
     }
 
     pub fn new_random(
@@ -68,7 +74,11 @@ impl CscMatrix {
             }
         }
 
-        CscMatrix::new(num_rows, end, ones)
+        CscMatrix {
+            num_rows,
+            end,
+            ones,
+        }
     }
 
     pub fn num_cols(&self) -> usize {

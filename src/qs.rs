@@ -1,11 +1,11 @@
 use rand_xoshiro::{rand_core::SeedableRng, Xoshiro256PlusPlus};
-use rug::{ops::CompleteRound, Assign, Complete, Float, Integer};
+use rug::{ops::CompleteRound, Complete, Float, Integer};
 
-use crate::mod_sqrt;
+use crate::{lanczos, linalg::CscMatrix, mod_sqrt};
 
 fn smoothness_bound(n: &Integer) -> usize {
     let l = Float::parse(n.to_string()).unwrap().complete(512).ln();
-    return Float::exp(0.5 * l.clone().sqrt() * l.ln().sqrt()).to_f64() as usize;
+    return (Float::exp(0.5 * l.clone().sqrt() * l.ln().sqrt()).to_f64() * 3.0) as usize;
 }
 
 fn factor_base(n: &Integer, smoothness_bound: usize) -> Vec<u32> {
@@ -22,8 +22,6 @@ fn factor_base(n: &Integer, smoothness_bound: usize) -> Vec<u32> {
             while j <= smoothness_bound {
                 is_prime[j] = false;
                 j += i;
-                is_prime[j] = false;
-                j += i;
             }
         }
     }
@@ -32,7 +30,7 @@ fn factor_base(n: &Integer, smoothness_bound: usize) -> Vec<u32> {
 }
 
 fn get_sieve_interval_len(smoothness_bound: usize) -> usize {
-    100 * smoothness_bound
+    10000 * smoothness_bound
 }
 
 fn ilog2_rounded(x: u32) -> u32 {
@@ -43,7 +41,12 @@ fn ilog2_rounded(x: u32) -> u32 {
 // TODO: Sieve with prime powers.
 pub fn factorize(n: &Integer) -> (Integer, Integer) {
     let smoothness_bound = smoothness_bound(&n);
+    eprintln!("Smoothness bound set to {}.", smoothness_bound);
     let factor_base = factor_base(&n, smoothness_bound);
+    eprintln!(
+        "Chose a factor base consisting of {} primes.",
+        factor_base.len()
+    );
 
     // IDEA: use SIMD gather to increment a bunch of sieve values at once? Probably not helpful
     //       since memory is the limit anyway, but try it.
@@ -58,12 +61,13 @@ pub fn factorize(n: &Integer) -> (Integer, Integer) {
     // The sieve array contains for each x in [0; m] an approxipation of the sum of logarithms of
     // all primes in the factor base, that divide (x + sqrt_n)^2 - n.
     let m = get_sieve_interval_len(smoothness_bound);
+    eprintln!("Initialized sieve array of length {}.", m);
     let mut sieve_array: Vec<u8> = vec![0; m];
 
     let mut xo = Xoshiro256PlusPlus::seed_from_u64(42);
     let sqrt_n = n.clone().sqrt();
 
-    const SIEVE_ERROR_LIMIT: u32 = 20;
+    const SIEVE_ERROR_LIMIT: u32 = 40;
 
     for &p in &factor_base {
         let log2p = ilog2_rounded(p);
@@ -83,6 +87,8 @@ pub fn factorize(n: &Integer) -> (Integer, Integer) {
         }
     }
 
+    eprintln!("Sieving has finished. Doing trial division on candidates for a smooth relation.");
+
     let log2_sqrt_n: u32 = Float::parse(n.to_string())
         .unwrap()
         .complete(512)
@@ -90,15 +96,12 @@ pub fn factorize(n: &Integer) -> (Integer, Integer) {
         .to_f32() as u32;
 
     let mut relations: Vec<Vec<u32>> = vec![];
-    for x in 0..m {
+    let mut fn_values: Vec<Integer> = vec![];
+    for x in 1..m {
         let expected = ilog2_rounded(x as u32) + 1 + log2_sqrt_n;
         if sieve_array[x] as u32 + SIEVE_ERROR_LIMIT >= expected {
             // Candidate for a smooth relation.
-            let mut y = Integer::new();
-            y.assign(&sqrt_n + x);
-            y.square_mut();
-            y -= n;
-
+            let mut y = (&sqrt_n + x).complete().square() - n;
             let mut odd_exponent_indices: Vec<u32> = vec![];
 
             for i in 0..factor_base.len() {
@@ -107,16 +110,41 @@ pub fn factorize(n: &Integer) -> (Integer, Integer) {
                     y.div_exact_u_mut(factor_base[i]);
                     odd_exponent = !odd_exponent;
                 }
-                if y == 1 && odd_exponent {
+                if odd_exponent {
                     odd_exponent_indices.push(i as u32);
-                    break;
                 }
             }
             if y == 1 {
                 relations.push(odd_exponent_indices);
+                fn_values.push((&sqrt_n + x).complete().square() - n);
             }
         }
     }
 
-    (Integer::new(), Integer::new())
+    eprintln!(
+        "Collected {} smooth relations. Starting Block Lanczos.",
+        relations.len()
+    );
+
+    let (x, num_dependencies) =
+        lanczos::find_dependencies(&CscMatrix::new(&relations, factor_base.len()));
+    for i in 0..num_dependencies {
+        let (mut a, mut b) = (Integer::from(1), Integer::from(1));
+        for j in 0..x.len() {
+            if (x[j] >> i) & 1 == 1 {
+                // The j-th relation is included.
+                for &k in &relations[j] {
+                    a *= factor_base[k as usize];
+                }
+                b *= &fn_values[j];
+            }
+        }
+
+        let c = a - b;
+        if c != 1 && &c != n && n.is_divisible(&c) {
+            return ((n / &c).complete(), c);
+        }
+    }
+
+    panic!("Only trivial divisors found.");
 }

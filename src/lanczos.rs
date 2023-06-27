@@ -235,17 +235,20 @@ fn combine_columns(a: &CscMatrix, mut x: BlockMatrix, vm: BlockMatrix) -> BlockM
 }
 
 // Returns a block of vectors in the nullspace of a.
-pub fn find_dependencies(a: &CscMatrix) -> BlockMatrix {
-    let n = a.num_cols();
-    let mut xo = Xoshiro256PlusPlus::seed_from_u64(998244353);
+pub fn find_dependencies(a: &CscMatrix) -> (BlockMatrix, u32) {
+    let (n, m) = (a.num_cols(), a.num_rows());
 
-    eprintln!(
-        "Solving linear system with {} rows and {} columns.",
-        a.num_rows(),
-        a.num_cols()
+    assert!(
+        m < n,
+        "Matrix has {} rows but only {} columns, so dependencies might not exist.",
+        m,
+        n
     );
+
+    eprintln!("Solving linear system with {} rows and {} columns.", m, n);
     let _ = io::stdout().flush();
 
+    let mut xo = Xoshiro256PlusPlus::seed_from_u64(998244353);
     loop {
         let (x, vm) = lanczos(a, &BlockMatrix::new_random(n, &mut xo));
         let y = combine_columns(a, x, vm);
@@ -260,7 +263,7 @@ pub fn find_dependencies(a: &CscMatrix) -> BlockMatrix {
                 u.count_ones()
             );
             let _ = io::stdout().flush();
-            return y;
+            return (y, u.count_ones());
         }
         eprintln!("No vectors in the nullspace found, retrying...");
         let _ = io::stdout().flush();
@@ -279,7 +282,7 @@ mod tests {
             let n: usize = 197 + 69 * i;
             let m: usize = n - 19;
             let a = CscMatrix::new_random(n, m, 17, &mut xo);
-            let x = find_dependencies(&a);
+            let (x, num_dependencies) = find_dependencies(&a);
 
             let r = &a * &x;
             for i in 0..m {

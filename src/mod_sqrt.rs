@@ -30,6 +30,12 @@ const fn mod_inverse(a: u64, n: u64) -> u64 {
 pub fn mod_sqrt(mut a: u64, p: u64, xo: &mut Xoshiro256PlusPlus) -> u64 {
     assert!(a <= u32::MAX as u64);
     assert!(p <= u32::MAX as u64);
+    if p == 2 {
+        assert_eq!(a, 1);
+        return 1;
+    }
+
+    assert_eq!(legendre(a, p), 1);
 
     if p & 3 == 3 {
         return mod_exp(a, (p + 1) >> 2, p);
