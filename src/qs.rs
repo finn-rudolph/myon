@@ -151,3 +151,25 @@ pub fn factorize(n: &Integer) -> (Integer, Integer) {
 
     panic!("Only trivial divisors found.");
 }
+
+#[cfg(test)]
+mod test {
+    use rug::rand::RandState;
+
+    use super::*;
+
+    #[test]
+    fn test_quadratic_sieve_general() {}
+
+    #[test]
+    fn test_quadratic_sieve_semiprimes() {
+        let mut rng = RandState::new();
+        rng.seed(&Integer::from(42));
+        for i in 0..109 {
+            let p = Integer::from(Integer::random_bits(15, &mut rng)).next_prime();
+            let q = Integer::from(Integer::random_bits(15, &mut rng)).next_prime();
+            let (s, t) = factorize(&(&p * &q).complete());
+            assert!((s == p && t == q) || (s == q && t == p));
+        }
+    }
+}
