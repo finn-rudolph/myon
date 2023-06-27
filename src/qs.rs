@@ -65,9 +65,9 @@ pub fn factorize(n: &Integer) -> (Integer, Integer) {
     let mut sieve_array: Vec<u8> = vec![0; m];
 
     let mut xo = Xoshiro256PlusPlus::seed_from_u64(42);
-    let sqrt_n = n.clone().sqrt();
+    let sqrt_n: Integer = n.clone().sqrt() + 1;
 
-    const SIEVE_ERROR_LIMIT: u32 = 40;
+    const SIEVE_ERROR_LIMIT: u32 = 80;
 
     for &p in &factor_base {
         let log2p = ilog2_rounded(p);
@@ -96,7 +96,7 @@ pub fn factorize(n: &Integer) -> (Integer, Integer) {
         .to_f32() as u32;
 
     let mut relations: Vec<Vec<u32>> = vec![];
-    let mut fn_values: Vec<Integer> = vec![];
+    let mut relation_indices: Vec<usize> = vec![];
     for x in 1..m {
         let expected = ilog2_rounded(x as u32) + 1 + log2_sqrt_n;
         if sieve_array[x] as u32 + SIEVE_ERROR_LIMIT >= expected {
@@ -116,7 +116,7 @@ pub fn factorize(n: &Integer) -> (Integer, Integer) {
             }
             if y == 1 {
                 relations.push(odd_exponent_indices);
-                fn_values.push((&sqrt_n + x).complete().square() - n);
+                relation_indices.push(x);
             }
         }
     }
@@ -129,19 +129,22 @@ pub fn factorize(n: &Integer) -> (Integer, Integer) {
     let (x, num_dependencies) =
         lanczos::find_dependencies(&CscMatrix::new(&relations, factor_base.len()));
     for i in 0..num_dependencies {
-        let (mut a, mut b) = (Integer::from(1), Integer::from(1));
+        let (mut a_squared, mut b) = (Integer::from(1), Integer::from(1));
         for j in 0..x.len() {
             if (x[j] >> i) & 1 == 1 {
                 // The j-th relation is included.
-                for &k in &relations[j] {
-                    a *= factor_base[k as usize];
-                }
-                b *= &fn_values[j];
+                a_squared *= (&sqrt_n + relation_indices[j]).complete().square() - n;
+                b *= (&sqrt_n + relation_indices[j]).complete();
             }
         }
 
-        let c = a - b;
-        if c != 1 && &c != n && n.is_divisible(&c) {
+        assert!(a_squared.is_perfect_square());
+        assert_eq!(
+            (&a_squared % n).complete(),
+            (&b.square_ref().complete() % n).complete()
+        );
+        let c = Integer::from(n.gcd_ref(&(a_squared.sqrt() + b)));
+        if c != 1 && &c != n {
             return ((n / &c).complete(), c);
         }
     }
