@@ -5,7 +5,7 @@ use crate::{lanczos, linalg::CscMatrix, mod_sqrt};
 
 fn smoothness_bound(n: &Integer) -> usize {
     let l = Float::parse(n.to_string()).unwrap().complete(512).ln();
-    return (Float::exp(0.5 * l.clone().sqrt() * l.ln().sqrt()).to_f64() * 3.0) as usize;
+    return (Float::exp(0.5 * l.clone().sqrt() * l.ln().sqrt()).to_f64() * 7.0) as usize;
 }
 
 fn factor_base(n: &Integer, smoothness_bound: usize) -> Vec<u32> {
@@ -30,7 +30,7 @@ fn factor_base(n: &Integer, smoothness_bound: usize) -> Vec<u32> {
 }
 
 fn get_sieve_interval_len(smoothness_bound: usize) -> usize {
-    10000 * smoothness_bound
+    1000 * smoothness_bound
 }
 
 fn ilog2_rounded(x: u32) -> u32 {
@@ -127,7 +127,7 @@ pub fn factorize(n: &Integer) -> (Integer, Integer) {
     );
 
     let (x, num_dependencies) =
-        lanczos::find_dependencies(&CscMatrix::new(&relations, factor_base.len()));
+        lanczos::find_dependencies(&CscMatrix::new(relations, factor_base.len()));
     for i in 0..num_dependencies {
         let (mut a_squared, mut b) = (Integer::from(1), Integer::from(1));
         for j in 0..x.len() {
@@ -165,9 +165,13 @@ mod test {
     fn test_quadratic_sieve_semiprimes() {
         let mut rng = RandState::new();
         rng.seed(&Integer::from(42));
-        for i in 0..109 {
-            let p = Integer::from(Integer::random_bits(15, &mut rng)).next_prime();
-            let q = Integer::from(Integer::random_bits(15, &mut rng)).next_prime();
+        for _ in 0..109 {
+            let p = Integer::from(Integer::random_bits(25, &mut rng)).next_prime();
+            let mut q = Integer::from(Integer::random_bits(25, &mut rng)).next_prime();
+            while p == q {
+                q = Integer::from(Integer::random_bits(25, &mut rng)).next_prime();
+            }
+            eprintln!("p = {}, q = {}, n = {}", &p, &q, (&p * &q).complete());
             let (s, t) = factorize(&(&p * &q).complete());
             assert!((s == p && t == q) || (s == q && t == p));
         }
