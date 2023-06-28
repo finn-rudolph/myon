@@ -40,6 +40,9 @@ fn ilog2_rounded(x: u32) -> u32 {
 // TODO: Measure accuracy of sieving heuristic with log.
 // TODO: Sieve with prime powers.
 pub fn factorize(n: &Integer) -> (Integer, Integer) {
+    assert!(!n.is_even());
+    assert!(!n.is_perfect_power());
+
     let smoothness_bound = smoothness_bound(&n);
     eprintln!("Smoothness bound set to {}.", smoothness_bound);
     let factor_base = factor_base(&n, smoothness_bound);

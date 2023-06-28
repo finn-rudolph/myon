@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::iter;
 
 use rug::{integer::IsPrime, Complete, Integer};
 
@@ -8,29 +8,39 @@ mod mod_sqrt;
 mod qs;
 
 pub fn factorize(n_str: &str) -> Vec<(String, u32)> {
+    // Keep a queue of factors of n that still need to be factored (or recognized as primes).
+    let mut ints_to_factor: Vec<Integer> = vec![Integer::parse(n_str).unwrap().complete()];
     let mut primes: Vec<Integer> = vec![];
-    let mut composites: VecDeque<Integer> =
-        VecDeque::from([Integer::parse(n_str).unwrap().complete()]);
 
     const MILLER_RABIN_ITERATIONS: u32 = 74;
 
-    while !composites.is_empty() {
-        let n = composites.pop_front().unwrap();
-        let (r, s) = qs::factorize(&n);
+    while !ints_to_factor.is_empty() {
+        let mut n = ints_to_factor.pop().unwrap();
+        let mut exponent_multiplier: u32 = 1;
 
-        if r.is_probably_prime(MILLER_RABIN_ITERATIONS) == IsPrime::No {
-            composites.push_back(r);
-        } else {
-            primes.push(r);
+        // The quadratic sieve requires that n must not be a power, so extract roots until this is
+        // satisfied.
+        let mut i: u32 = 2;
+        while n.is_perfect_power() {
+            let (root, remainder) = n.root_rem_ref(i).complete();
+            if remainder == 0 {
+                exponent_multiplier *= i;
+                n = root;
+            }
+            i += 1;
         }
 
-        if s.is_probably_prime(MILLER_RABIN_ITERATIONS) == IsPrime::No {
-            composites.push_back(s);
+        if n.is_probably_prime(MILLER_RABIN_ITERATIONS) != IsPrime::No {
+            primes.extend(iter::repeat(n).take(exponent_multiplier as usize));
         } else {
-            primes.push(s);
+            let (r, s) = qs::factorize(&n);
+            for x in [r, s] {
+                ints_to_factor.extend(iter::repeat(x).take(exponent_multiplier as usize));
+            }
         }
     }
 
+    // Group equal prime factors together and write each factor and it's exponent in a tuple.
     primes.sort();
     let mut factorization: Vec<(String, u32)> = vec![];
 
