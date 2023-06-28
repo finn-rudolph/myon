@@ -198,27 +198,33 @@ fn combine_columns(a: &CscMatrix, mut x: BlockMatrix, vm: BlockMatrix) -> BlockM
             break;
         }
 
-        let leading_bit_col: usize = leading_bit / N;
+        let leading_bit_word: usize = leading_bit / N;
         let leading_bit_mask: u64 = (leading_bit & (N - 1)) as u64;
 
         // Search pivot.
-        for j in i..2 * N {
-            if r[j][leading_bit_col] & leading_bit_mask != 0 {
+        let mut j = i;
+        while j < 2 * N {
+            if r[j][leading_bit_word] & leading_bit_mask != 0 {
                 r.swap(i, j);
                 s.swap(i, j);
                 break;
             }
+            j += 1;
         }
 
         // Eliminate pivot from other columns.
-        if r[i][leading_bit_col] & leading_bit_mask != 0 {
-            for j in i..2 * N {
-                if r[j][leading_bit_col] & leading_bit_mask != 0 {
+        if r[i][leading_bit_word] & leading_bit_mask != 0 {
+            j += 1;
+            while j < 2 * N {
+                if r[j][leading_bit_word] & leading_bit_mask != 0 {
                     for k in 0..r[i].len() {
                         r[j][k] ^= r[i][k];
+                    }
+                    for k in 0..s[i].len() {
                         s[j][k] ^= s[i][k];
                     }
                 }
+                j += 1;
             }
             i += 1;
         }
@@ -258,6 +264,12 @@ pub fn find_dependencies(a: &CscMatrix) -> (BlockMatrix, u32) {
         }
 
         if u != 0 {
+            // Verify that the vectors found lie indeed in the nullspace.
+            let z = a * &y;
+            for i in 0..m {
+                assert_eq!(z[i], 0);
+            }
+
             eprintln!(
                 "Found {} nontrivial vectors in the nullspace.",
                 u.count_ones()
@@ -278,12 +290,13 @@ mod tests {
     fn test_lanczos() {
         let mut xo = Xoshiro256PlusPlus::seed_from_u64((1 << 61) - 1);
 
-        for i in 0..11 {
-            let n: usize = 197 + 69 * i;
+        for i in 0..61 {
+            let n: usize = 197 + 19 * i;
             let m: usize = n - 19;
             let a = CscMatrix::new_random(n, m, 17, &mut xo);
             let (x, num_dependencies) = find_dependencies(&a);
 
+            assert!(num_dependencies != 0);
             let r = &a * &x;
             for i in 0..m {
                 assert_eq!(r[i], 0);
