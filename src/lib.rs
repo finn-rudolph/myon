@@ -9,41 +9,42 @@ mod linalg;
 mod mod_sqrt;
 mod qs;
 
-// Create own error type to hide the multiprecision library from the user.
 #[derive(Debug)]
-pub struct MyonParseError {}
+pub struct MyonError {
+    message: String,
+}
 
-impl Error for MyonParseError {}
-
-impl fmt::Display for MyonParseError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "The given string could not be parsed as an integer.")
+impl MyonError {
+    fn new(message: &str) -> MyonError {
+        MyonError {
+            message: message.to_string(),
+        }
     }
 }
 
-#[derive(Debug)]
-pub struct MyonNegativeError {}
+impl Error for MyonError {}
 
-impl Error for MyonNegativeError {}
-
-impl fmt::Display for MyonNegativeError {
+impl fmt::Display for MyonError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "The given integer is negative. Only positive integers are allowed."
-        )
+        write!(f, "{}", self.message)
     }
 }
 
-pub fn factorize(n_str: &str) -> Result<Vec<(String, u32)>, &dyn Error> {
+pub fn factorize(n_str: &str) -> Result<Vec<(String, u32)>, MyonError> {
     // Keep a queue of factors of n that still need to be factored (or recognized as primes).
     let n: Integer = match Integer::parse(n_str) {
         Ok(v) => v.complete(),
-        Err(_) => return Err(&MyonParseError {}),
+        Err(_) => {
+            return Err(MyonError::new(
+                "The given string could not be parsed as an integer.",
+            ))
+        }
     };
 
     if n < 0 {
-        return Err(&MyonNegativeError {});
+        return Err(MyonError::new(
+            "The given integer is negative. Only positive integers are allowed.",
+        ));
     }
 
     let mut ints_to_factor: Vec<Integer> = vec![n];
