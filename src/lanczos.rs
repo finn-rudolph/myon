@@ -36,8 +36,8 @@ fn max_invertible_submatrix(mut vtav: BlockMatrix, previous_d: u64) -> (u64, Blo
         // Search pivot.
         for j in i..N {
             if (vtav[c[j]] >> c[i]) & 1 == 1 {
-                vtav.swap(c[i], c[j]);
-                w_inv.swap(c[i], c[j]);
+                vtav.as_mut().swap(c[i], c[j]);
+                w_inv.as_mut().swap(c[i], c[j]);
                 break;
             }
         }
@@ -54,8 +54,8 @@ fn max_invertible_submatrix(mut vtav: BlockMatrix, previous_d: u64) -> (u64, Blo
         } else {
             for j in i..N {
                 if (w_inv[c[j]] >> c[i]) & 1 == 1 {
-                    vtav.swap(c[i], c[j]);
-                    w_inv.swap(c[i], c[j]);
+                    vtav.as_mut().swap(c[i], c[j]);
+                    w_inv.as_mut().swap(c[i], c[j]);
                     break;
                 }
             }

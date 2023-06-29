@@ -5,6 +5,7 @@ use rand_xoshiro::{rand_core::RngCore, Xoshiro256PlusPlus};
 
 pub const N: usize = 64;
 
+// A BlockMatrix of length n filled with x can be created by block_matrix![x; n].
 macro_rules! block_matrix {
     ( $x:expr; $n:expr ) => {
         BlockMatrix::from(vec![$x; $n])
@@ -26,6 +27,7 @@ pub struct CscMatrixTranspose<'a> {
 }
 
 // A dense binary matrix storing each row as an N-bit integer.
+#[repr(transparent)]
 #[derive(Clone)]
 pub struct BlockMatrix(Vec<u64>);
 
@@ -107,14 +109,6 @@ impl BlockMatrix {
         a
     }
 
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    pub fn swap(&mut self, i: usize, j: usize) {
-        self.0.swap(i, j);
-    }
-
     // Provides a lightweight view on the transposed matrix, which isn't intendend to be used
     // standalone, but as an argument to the '*'-Operator (on any side).
     pub fn transpose(&self) -> BlockMatrixTranspose {
@@ -123,10 +117,10 @@ impl BlockMatrix {
 
     // Calculates the transpose explicity as a two-dimensional vector, in row-major format.
     pub fn explicit_transpose(&self) -> Vec<Vec<u64>> {
-        let n_words = (self.len() + N - 1) / N;
+        let n_words = (self.as_ref().len() + N - 1) / N;
         let mut res: Vec<Vec<u64>> = vec![vec![0; n_words]; N];
 
-        for i in 0..self.len() {
+        for i in 0..self.as_ref().len() {
             for j in 0..N {
                 res[j][i / N] |= ((self[i] >> j) & 1) << (i & (N - 1));
             }
@@ -136,7 +130,7 @@ impl BlockMatrix {
     }
 
     pub fn is_symmetric(&self) -> bool {
-        assert_eq!(self.len(), N);
+        assert_eq!(self.as_ref().len(), N);
         for i in 0..N {
             for j in 0..N {
                 if (self[i] >> j) & 1 != (self[j] >> i) & 1 {
@@ -154,17 +148,29 @@ impl From<Vec<u64>> for BlockMatrix {
     }
 }
 
+impl AsRef<Vec<u64>> for BlockMatrix {
+    fn as_ref(&self) -> &Vec<u64> {
+        &self.0
+    }
+}
+
+impl AsMut<Vec<u64>> for BlockMatrix {
+    fn as_mut(&mut self) -> &mut Vec<u64> {
+        &mut self.0
+    }
+}
+
 impl Index<usize> for BlockMatrix {
     type Output = u64;
 
     fn index(&self, i: usize) -> &u64 {
-        &self.0[i]
+        &self.as_ref()[i]
     }
 }
 
 impl IndexMut<usize> for BlockMatrix {
     fn index_mut(&mut self, i: usize) -> &mut u64 {
-        &mut self.0[i]
+        &mut self.as_mut()[i]
     }
 }
 
@@ -176,7 +182,7 @@ impl Mul<&BlockMatrix> for &CscMatrix {
 
     fn mul(self, b: &BlockMatrix) -> BlockMatrix {
         let (n, m) = (self.num_cols(), self.num_rows());
-        assert_eq!(n, b.len());
+        assert_eq!(n, b.as_ref().len());
         let mut res = block_matrix![0; m];
 
         let mut j: usize = 0;
@@ -196,7 +202,7 @@ impl<'a> Mul<&BlockMatrix> for &CscMatrixTranspose<'a> {
 
     fn mul(self, b: &BlockMatrix) -> BlockMatrix {
         let (n, m) = (self.borrowed.num_cols(), self.borrowed.num_rows());
-        assert_eq!(m, b.len());
+        assert_eq!(m, b.as_ref().len());
         let mut res = block_matrix![0; n];
 
         let mut j: usize = 0;
@@ -215,8 +221,8 @@ impl Mul<&BlockMatrix> for &BlockMatrix {
     type Output = BlockMatrix;
 
     fn mul(self, b: &BlockMatrix) -> BlockMatrix {
-        assert_eq!(N, b.len());
-        let n = self.len();
+        assert_eq!(N, b.as_ref().len());
+        let n = self.as_ref().len();
         let mut res = block_matrix![0; n];
 
         for i in 0..n {
@@ -239,9 +245,9 @@ impl<'a> Mul<&BlockMatrixTranspose<'a>> for &BlockMatrix {
     type Output = BlockMatrix;
 
     fn mul(self, b: &BlockMatrixTranspose<'a>) -> BlockMatrix {
-        let n = self.len();
+        let n = self.as_ref().len();
         assert!(n >= N);
-        assert_eq!(N, b.borrowed.len());
+        assert_eq!(N, b.borrowed.as_ref().len());
         let mut res = block_matrix![0; n];
 
         for i in 0..n {
@@ -258,8 +264,8 @@ impl<'a> Mul<&BlockMatrix> for &BlockMatrixTranspose<'a> {
     type Output = BlockMatrix;
 
     fn mul(self, b: &BlockMatrix) -> BlockMatrix {
-        let n = self.borrowed.len();
-        assert_eq!(b.len(), n);
+        let n = self.borrowed.as_ref().len();
+        assert_eq!(b.as_ref().len(), n);
         let mut res = block_matrix![0; N];
 
         for i in 0..n {

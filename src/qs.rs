@@ -135,7 +135,7 @@ pub fn factorize(n: &Integer) -> (Integer, Integer) {
         lanczos::find_dependencies(&CscMatrix::new(relations, factor_base.len()));
     for i in 0..num_dependencies {
         let (mut a_squared, mut b) = (Integer::from(1), Integer::from(1));
-        for j in 0..x.len() {
+        for j in 0..x.as_ref().len() {
             if (x[j] >> i) & 1 == 1 {
                 // The j-th relation is included.
                 a_squared *= (&sqrt_n + relation_indices[j]).complete().square() - n;
