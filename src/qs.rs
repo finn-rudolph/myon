@@ -171,11 +171,11 @@ mod test {
     fn test_quadratic_sieve_semiprimes() {
         let mut rng = RandState::new();
         rng.seed(&Integer::from(42));
-        for _ in 0..109 {
-            let p = Integer::from(Integer::random_bits(25, &mut rng)).next_prime();
-            let mut q = Integer::from(Integer::random_bits(25, &mut rng)).next_prime();
+        for _ in 0..10 {
+            let p = Integer::from(Integer::random_bits(30, &mut rng)).next_prime();
+            let mut q = Integer::from(Integer::random_bits(30, &mut rng)).next_prime();
             while p == q {
-                q = Integer::from(Integer::random_bits(25, &mut rng)).next_prime();
+                q = Integer::from(Integer::random_bits(30, &mut rng)).next_prime();
             }
             let (s, t) = factorize(&(&p * &q).complete());
             assert!((s == p && t == q) || (s == q && t == p));

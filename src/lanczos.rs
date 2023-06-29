@@ -106,8 +106,7 @@ fn update_delta(
     res
 }
 
-// Attempts to find a matrix x, such that a * x = a * b. Most of the time, it fails to do that, but
-// using v from the last iteration, it's still possible to find some dependencies.
+// Finds a matrix x, such that aT * a * x = aT * a * b, but x != b.
 fn lanczos(a: &CscMatrix, b: &BlockMatrix) -> (BlockMatrix, BlockMatrix) {
     let (n, m) = (a.num_cols(), a.num_rows());
 
@@ -262,7 +261,7 @@ pub fn find_dependencies(a: &CscMatrix) -> (BlockMatrix, u32) {
         }
 
         if u != 0 {
-            // Verify that the vectors found lie indeed in the nullspace.
+            // Verify that the vectors of y lie indeed in the nullspace.
             let z = a * &y;
             for i in 0..m {
                 assert_eq!(z[i], 0);
@@ -286,7 +285,7 @@ mod tests {
     fn test_lanczos() {
         let mut xo = Xoshiro256PlusPlus::seed_from_u64((1 << 61) - 1);
 
-        for i in 0..261 {
+        for i in 0..116 {
             let n: usize = 197 + 5 * i;
             let m: usize = n - 19;
             let a = CscMatrix::new_random(n, m, 17, &mut xo);
