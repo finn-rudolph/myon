@@ -64,7 +64,7 @@ pub fn factorize(n: &Integer) -> (Integer, Integer) {
     //       since memory bandwith is probably the bottleneck.)
 
     // The sieve array contains for each x in [0; m] an approxipation of the sum of logarithms of
-    // all primes in the factor base, that divide (x + sqrt_n)^2 - n.
+    // all primes in the factor base that divide (x + sqrt_n)^2 - n.
     let m = get_sieve_interval_len(smoothness_bound);
     info!("Initialized sieve array of length {}.", m);
     let mut sieve_array: Vec<u8> = vec![0; m];

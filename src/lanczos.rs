@@ -106,14 +106,14 @@ fn update_delta(
     res
 }
 
-// Finds a matrix x, such that aT * a * x = aT * a * b, but x != b.
-fn lanczos(a: &CscMatrix, b: &BlockMatrix) -> (BlockMatrix, BlockMatrix) {
-    let (n, m) = (a.num_cols(), a.num_rows());
+// Finds a matrix x, such that a * x = a * y, but x != y, where A = b * bT.
+fn lanczos(b: &CscMatrix, y: &BlockMatrix) -> (BlockMatrix, BlockMatrix) {
+    let (n, m) = (b.num_cols(), b.num_rows());
 
-    let v0 = &a.transpose() * &(a * b);
+    let v0 = &b.transpose() * &(b * y);
     let mut v = v0.clone();
     let mut p = block_matrix![0; n];
-    let mut x = b.clone();
+    let mut x = y.clone();
     let mut delta: [BlockMatrix; 2] = [&v0.transpose() * &v0, block_matrix![0; N]];
 
     let mut d: u64 = !0u64;
@@ -123,7 +123,7 @@ fn lanczos(a: &CscMatrix, b: &BlockMatrix) -> (BlockMatrix, BlockMatrix) {
     // The recurrence implemented here is based on the decription of Bos, J. W & Lenstra, A. K.
     // (2017), page 184.
     loop {
-        let av = &a.transpose() * &(a * &v);
+        let av = &b.transpose() * &(b * &v);
         let vtav = &v.transpose() * &av;
         let vta2v = &av.transpose() * &av;
 
@@ -183,10 +183,10 @@ fn lanczos(a: &CscMatrix, b: &BlockMatrix) -> (BlockMatrix, BlockMatrix) {
 
 // Uses x and vm to find vectors in the nullspace of a by elimination. The returned BlockMatrix
 // contains the vectors found in the lower order bits, the remaining bits are zeroed.
-fn combine_columns(a: &CscMatrix, mut x: BlockMatrix, vm: BlockMatrix) -> BlockMatrix {
-    let (n, m) = (a.num_cols(), a.num_rows());
-    let mut r: Vec<Vec<u64>> = (a * &x).explicit_transpose();
-    r.append(&mut (a * &vm).explicit_transpose());
+fn combine_columns(b: &CscMatrix, mut x: BlockMatrix, vm: BlockMatrix) -> BlockMatrix {
+    let (n, m) = (b.num_cols(), b.num_rows());
+    let mut r: Vec<Vec<u64>> = (b * &x).explicit_transpose();
+    r.append(&mut (b * &vm).explicit_transpose());
     let mut s: Vec<Vec<u64>> = x.explicit_transpose();
     s.append(&mut vm.explicit_transpose());
 
@@ -239,8 +239,8 @@ fn combine_columns(a: &CscMatrix, mut x: BlockMatrix, vm: BlockMatrix) -> BlockM
 }
 
 // Returns a block of vectors in the nullspace of a.
-pub fn find_dependencies(a: &CscMatrix) -> (BlockMatrix, u32) {
-    let (n, m) = (a.num_cols(), a.num_rows());
+pub fn find_dependencies(b: &CscMatrix) -> (BlockMatrix, u32) {
+    let (n, m) = (b.num_cols(), b.num_rows());
 
     assert!(
         m < n,
@@ -253,16 +253,16 @@ pub fn find_dependencies(a: &CscMatrix) -> (BlockMatrix, u32) {
 
     let mut xo = Xoshiro256PlusPlus::seed_from_u64(998244353);
     loop {
-        let (x, vm) = lanczos(a, &BlockMatrix::new_random(n, &mut xo));
-        let y = combine_columns(a, x, vm);
+        let (mut x, vm) = lanczos(b, &BlockMatrix::new_random(n, &mut xo));
+        x = combine_columns(b, x, vm);
         let mut u: u64 = 0;
         for i in 0..n {
-            u |= y[i];
+            u |= x[i];
         }
 
         if u != 0 {
             // Verify that the vectors of y lie indeed in the nullspace.
-            let z = a * &y;
+            let z = b * &x;
             for i in 0..m {
                 assert_eq!(z[i], 0);
             }
@@ -271,7 +271,7 @@ pub fn find_dependencies(a: &CscMatrix) -> (BlockMatrix, u32) {
                 "Found {} nontrivial vectors in the nullspace.",
                 u.count_ones()
             );
-            return (y, u.count_ones());
+            return (x, u.count_ones());
         }
         info!("No vectors in the nullspace found, retrying...");
     }
@@ -288,11 +288,11 @@ mod tests {
         for i in 0..116 {
             let n: usize = 197 + 5 * i;
             let m: usize = n - 19;
-            let a = CscMatrix::new_random(n, m, 17, &mut xo);
-            let (x, num_dependencies) = find_dependencies(&a);
+            let b = CscMatrix::new_random(n, m, 17, &mut xo);
+            let (x, num_dependencies) = find_dependencies(&b);
 
             assert!(num_dependencies != 0);
-            let r = &a * &x;
+            let r = &b * &x;
             for i in 0..m {
                 assert_eq!(r[i], 0);
             }
