@@ -3,6 +3,11 @@ name = "myon"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
+description = "Implementation of the Quadratic Sieve and Number Field Sieve"
+repository = "https://github.com/finn-rudolph/myon"
+readme = "README.md"
+keywords = ["factorization", "quadratic-sieve", "number-field-sieve"]
+categories = ["algorithms", "mathematics"]
 
 [dependencies]
 log = "0.4.19"
