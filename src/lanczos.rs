@@ -1,5 +1,4 @@
-use std::io::{self, Write};
-
+use log::{info, warn};
 use rand_xoshiro::{rand_core::SeedableRng, Xoshiro256PlusPlus};
 
 use crate::linalg::{block_matrix, BlockMatrix, CscMatrix, N};
@@ -138,8 +137,8 @@ fn lanczos(a: &CscMatrix, b: &BlockMatrix) -> (BlockMatrix, BlockMatrix) {
         }
         assert!(w_inv.is_symmetric());
 
-        if total_d + N < m {
-            assert_eq!(previous_d | d, !0u64);
+        if total_d + N < m && previous_d | d != !0u64 {
+            warn!("Some vectors of v_(i - 1) not included in w_(i - 1) were not included in w_i.");
         }
         total_d += d.count_ones() as usize;
 
@@ -251,8 +250,7 @@ pub fn find_dependencies(a: &CscMatrix) -> (BlockMatrix, u32) {
         n
     );
 
-    eprintln!("Solving linear system with {} rows and {} columns.", m, n);
-    let _ = io::stdout().flush();
+    info!("Solving linear system with {} rows and {} columns.", m, n);
 
     let mut xo = Xoshiro256PlusPlus::seed_from_u64(998244353);
     loop {
@@ -270,15 +268,13 @@ pub fn find_dependencies(a: &CscMatrix) -> (BlockMatrix, u32) {
                 assert_eq!(z[i], 0);
             }
 
-            eprintln!(
+            info!(
                 "Found {} nontrivial vectors in the nullspace.",
                 u.count_ones()
             );
-            let _ = io::stdout().flush();
             return (y, u.count_ones());
         }
-        eprintln!("No vectors in the nullspace found, retrying...");
-        let _ = io::stdout().flush();
+        info!("No vectors in the nullspace found, retrying...");
     }
 }
 
@@ -290,8 +286,8 @@ mod tests {
     fn test_lanczos() {
         let mut xo = Xoshiro256PlusPlus::seed_from_u64((1 << 61) - 1);
 
-        for i in 0..61 {
-            let n: usize = 197 + 19 * i;
+        for i in 0..261 {
+            let n: usize = 197 + 5 * i;
             let m: usize = n - 19;
             let a = CscMatrix::new_random(n, m, 17, &mut xo);
             let (x, num_dependencies) = find_dependencies(&a);

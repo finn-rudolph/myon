@@ -1,5 +1,5 @@
-use std::convert::From;
-use std::ops::{Index, IndexMut, Mul};
+use core::convert::From;
+use core::ops::{Index, IndexMut, Mul};
 
 use rand_xoshiro::{rand_core::RngCore, Xoshiro256PlusPlus};
 
@@ -167,6 +167,9 @@ impl IndexMut<usize> for BlockMatrix {
         &mut self.0[i]
     }
 }
+
+// TODO: Optimize all code from here on (unroll, maybe use count trailing zeros to skip zeros in
+//       matrix-vector-product, try to remove some branches).
 
 impl Mul<&BlockMatrix> for &CscMatrix {
     type Output = BlockMatrix;

@@ -1,3 +1,4 @@
+use log::{error, info};
 use rand_xoshiro::{rand_core::SeedableRng, Xoshiro256PlusPlus};
 use rug::{ops::CompleteRound, Complete, Float, Integer};
 
@@ -30,7 +31,7 @@ fn factor_base(n: &Integer, smoothness_bound: usize) -> Vec<u32> {
 }
 
 fn get_sieve_interval_len(smoothness_bound: usize) -> usize {
-    1000 * smoothness_bound
+    100 * smoothness_bound
 }
 
 fn ilog2_rounded(x: u32) -> u32 {
@@ -44,9 +45,10 @@ pub fn factorize(n: &Integer) -> (Integer, Integer) {
     assert!(!n.is_perfect_power());
 
     let smoothness_bound = smoothness_bound(&n);
-    eprintln!("Smoothness bound set to {}.", smoothness_bound);
+
+    info!("Smoothness bound set to {}.", smoothness_bound);
     let factor_base = factor_base(&n, smoothness_bound);
-    eprintln!(
+    info!(
         "Chose a factor base consisting of {} primes.",
         factor_base.len()
     );
@@ -64,7 +66,7 @@ pub fn factorize(n: &Integer) -> (Integer, Integer) {
     // The sieve array contains for each x in [0; m] an approxipation of the sum of logarithms of
     // all primes in the factor base, that divide (x + sqrt_n)^2 - n.
     let m = get_sieve_interval_len(smoothness_bound);
-    eprintln!("Initialized sieve array of length {}.", m);
+    info!("Initialized sieve array of length {}.", m);
     let mut sieve_array: Vec<u8> = vec![0; m];
 
     let mut xo = Xoshiro256PlusPlus::seed_from_u64(42);
@@ -90,7 +92,7 @@ pub fn factorize(n: &Integer) -> (Integer, Integer) {
         }
     }
 
-    eprintln!("Sieving has finished. Doing trial division on candidates for a smooth relation.");
+    info!("Sieving has finished. Doing trial division on candidates for a smooth relation.");
 
     let log2_sqrt_n: u32 = Float::parse(n.to_string())
         .unwrap()
@@ -124,7 +126,7 @@ pub fn factorize(n: &Integer) -> (Integer, Integer) {
         }
     }
 
-    eprintln!(
+    info!(
         "Collected {} smooth relations. Starting Block Lanczos.",
         relations.len()
     );
@@ -152,7 +154,8 @@ pub fn factorize(n: &Integer) -> (Integer, Integer) {
         }
     }
 
-    panic!("Only trivial divisors found.");
+    error!("Only trivial divisors found.");
+    panic!();
 }
 
 #[cfg(test)]
@@ -174,7 +177,6 @@ mod test {
             while p == q {
                 q = Integer::from(Integer::random_bits(25, &mut rng)).next_prime();
             }
-            eprintln!("p = {}, q = {}, n = {}", &p, &q, (&p * &q).complete());
             let (s, t) = factorize(&(&p * &q).complete());
             assert!((s == p && t == q) || (s == q && t == p));
         }

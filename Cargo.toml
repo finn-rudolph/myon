@@ -1,8 +1,12 @@
 [package]
-name = "nfs"
+name = "myon"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+log = "0.4.19"
 rand_xoshiro = "0.6.0"
 rug = "1.19.2"
+
+[dev-dependencies]
+env_logger = "0.10.0"

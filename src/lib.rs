@@ -1,4 +1,6 @@
-use std::iter;
+use core::fmt::{self, Formatter};
+use core::iter;
+use std::error::Error;
 
 use rug::{integer::IsPrime, Complete, Integer};
 
@@ -7,9 +9,44 @@ mod linalg;
 mod mod_sqrt;
 mod qs;
 
-pub fn factorize(n_str: &str) -> Vec<(String, u32)> {
+// Create own error type to hide the multiprecision library from the user.
+#[derive(Debug)]
+pub struct MyonParseError {}
+
+impl Error for MyonParseError {}
+
+impl fmt::Display for MyonParseError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "The given string could not be parsed as an integer.")
+    }
+}
+
+#[derive(Debug)]
+pub struct MyonNegativeError {}
+
+impl Error for MyonNegativeError {}
+
+impl fmt::Display for MyonNegativeError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "The given integer is negative. Only positive integers are allowed."
+        )
+    }
+}
+
+pub fn factorize(n_str: &str) -> Result<Vec<(String, u32)>, &dyn Error> {
     // Keep a queue of factors of n that still need to be factored (or recognized as primes).
-    let mut ints_to_factor: Vec<Integer> = vec![Integer::parse(n_str).unwrap().complete()];
+    let n: Integer = match Integer::parse(n_str) {
+        Ok(v) => v.complete(),
+        Err(_) => return Err(&MyonParseError {}),
+    };
+
+    if n < 0 {
+        return Err(&MyonNegativeError {});
+    }
+
+    let mut ints_to_factor: Vec<Integer> = vec![n];
     let mut primes: Vec<Integer> = vec![];
 
     const MILLER_RABIN_ITERATIONS: u32 = 74;
@@ -19,7 +56,7 @@ pub fn factorize(n_str: &str) -> Vec<(String, u32)> {
         let mut exponent_multiplier: u32 = 1;
 
         // The quadratic sieve requires that n must not be a power, so extract roots until this is
-        // satisfied.
+        // satisfied. (TODO: Maybe optimize this to do it only on primes.)
         let mut i: u32 = 2;
         while n.is_perfect_power() {
             let (root, remainder) = n.root_rem_ref(i).complete();
@@ -55,5 +92,5 @@ pub fn factorize(n_str: &str) -> Vec<(String, u32)> {
         i = j;
     }
 
-    factorization
+    Ok(factorization)
 }
