@@ -87,7 +87,7 @@ pub fn factorize(n_str: &str) -> Result<Vec<(String, u32)>, MyonError> {
         factorization.push((primes[i].to_string(), 1));
         let mut j = i + 1;
         while j < primes.len() && primes[j] == primes[i] {
-            factorization.last_mut().as_deref_mut().unwrap().1 += 1;
+            factorization.last_mut().unwrap().1 += 1;
             j += 1;
         }
         i = j;

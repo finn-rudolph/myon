@@ -6,7 +6,7 @@ use crate::{lanczos, linalg::CscMatrix, mod_sqrt};
 
 fn smoothness_bound(n: &Integer) -> usize {
     let l = Float::parse(n.to_string()).unwrap().complete(512).ln();
-    return (Float::exp(0.5 * l.clone().sqrt() * l.ln().sqrt()).to_f64() * 7.0) as usize;
+    (Float::exp(0.5 * l.clone().sqrt() * l.ln().sqrt()).to_f64() * 7.0) as usize
 }
 
 fn factor_base(n: &Integer, smoothness_bound: usize) -> Vec<u32> {
@@ -44,12 +44,12 @@ pub fn factorize(n: &Integer) -> (Integer, Integer) {
     assert!(!n.is_even());
     assert!(!n.is_perfect_power());
 
-    let smoothness_bound = smoothness_bound(&n);
+    let smoothness_bound = smoothness_bound(n);
 
-    info!("Smoothness bound set to {}.", smoothness_bound);
-    let factor_base = factor_base(&n, smoothness_bound);
+    info!("smoothness bound set to {}", smoothness_bound);
+    let factor_base = factor_base(n, smoothness_bound);
     info!(
-        "Chose a factor base consisting of {} primes.",
+        "chose a factor base consisting of {} primes",
         factor_base.len()
     );
 
@@ -66,7 +66,7 @@ pub fn factorize(n: &Integer) -> (Integer, Integer) {
     // The sieve array contains for each x in [0; m] an approxipation of the sum of logarithms of
     // all primes in the factor base that divide (x + sqrt_n)^2 - n.
     let m = get_sieve_interval_len(smoothness_bound);
-    info!("Initialized sieve array of length {}.", m);
+    info!("initialized sieve array of length {}", m);
     let mut sieve_array: Vec<u8> = vec![0; m];
 
     let mut xo = Xoshiro256PlusPlus::seed_from_u64(42);
@@ -92,7 +92,7 @@ pub fn factorize(n: &Integer) -> (Integer, Integer) {
         }
     }
 
-    info!("Sieving has finished. Doing trial division on candidates for a smooth relation.");
+    info!("sieving has finished, doing trial division on candidates for a smooth relation");
 
     let log2_sqrt_n: u32 = Float::parse(n.to_string())
         .unwrap()
@@ -127,7 +127,7 @@ pub fn factorize(n: &Integer) -> (Integer, Integer) {
     }
 
     info!(
-        "Collected {} smooth relations. Starting Block Lanczos.",
+        "collected {} smooth relations, starting Block Lanczos",
         relations.len()
     );
 
@@ -154,7 +154,7 @@ pub fn factorize(n: &Integer) -> (Integer, Integer) {
         }
     }
 
-    error!("Only trivial divisors found.");
+    error!("only trivial divisors found");
     panic!();
 }
 

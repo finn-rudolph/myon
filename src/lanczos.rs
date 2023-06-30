@@ -244,12 +244,12 @@ pub fn find_dependencies(b: &CscMatrix) -> (BlockMatrix, u32) {
 
     assert!(
         m < n,
-        "Matrix has {} rows but only {} columns, so dependencies might not exist.",
+        "matrix has {} rows but only {} columns, so dependencies might not exist.",
         m,
         n
     );
 
-    info!("Solving linear system with {} rows and {} columns.", m, n);
+    info!("solving linear system with {} rows and {} columns", m, n);
 
     let mut xo = Xoshiro256PlusPlus::seed_from_u64(998244353);
     loop {
@@ -268,12 +268,12 @@ pub fn find_dependencies(b: &CscMatrix) -> (BlockMatrix, u32) {
             }
 
             info!(
-                "Found {} nontrivial vectors in the nullspace.",
+                "found {} nontrivial vectors in the nullspace",
                 u.count_ones()
             );
             return (x, u.count_ones());
         }
-        info!("No vectors in the nullspace found, retrying...");
+        info!("no vectors in the nullspace found, retrying...");
     }
 }
 

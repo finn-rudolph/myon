@@ -2,6 +2,7 @@
 name = "myon"
 version = "0.1.0"
 edition = "2021"
+authors = ["Finn Rudolph"]
 license = "MIT"
 description = "Implementation of the Quadratic Sieve and Number Field Sieve"
 repository = "https://github.com/finn-rudolph/myon"

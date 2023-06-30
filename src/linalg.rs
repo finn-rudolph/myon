@@ -58,7 +58,7 @@ impl CscMatrix {
     ) -> CscMatrix {
         let mut end: Vec<u32> = vec![0; 0];
         let mut ones: Vec<u32> = vec![0; 0];
-        let mut used: Vec<bool> = vec![0 != 0; num_rows];
+        let mut used: Vec<bool> = vec![false; num_rows];
 
         // Choose the number of nonzero entries for each column at random, then generate the indices
         // of 1s at random, avoiding duplicates in a column.
@@ -138,7 +138,7 @@ impl BlockMatrix {
                 }
             }
         }
-        return true;
+        true
     }
 }
 
