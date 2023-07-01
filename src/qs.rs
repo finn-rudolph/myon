@@ -1,7 +1,7 @@
 use log::{error, info};
 use rug::{ops::CompleteRound, Complete, Float, Integer};
 
-use crate::{lanczos, linalg::CscMatrix, mod_sqrt};
+use crate::{lanczos, linalg::CscMatrix, nt};
 
 struct FactorBaseElem {
     p: u32,
@@ -12,7 +12,7 @@ impl FactorBaseElem {
     fn new(p: u32, n: &Integer) -> FactorBaseElem {
         FactorBaseElem {
             p,
-            t: mod_sqrt::mod_sqrt((n % p).complete().to_u64().unwrap(), p as u64) as u32,
+            t: nt::mod_sqrt((n % p).complete().to_u64().unwrap(), p as u64) as u32,
         }
     }
 }
@@ -85,7 +85,8 @@ fn sieve(f: Polynomial, factor_base: &Vec<FactorBaseElem>, m: usize) -> Vec<Rela
     // Don't sieve with 2 for now.
     for &FactorBaseElem { p, t } in factor_base.iter().skip(1) {
         let log2p = ilog2_rounded(p) as u8;
-        let a_inv = mod_sqrt::mod_inverse((&a % p).complete().to_u64().unwrap(), p as u64);
+        // Initialization stage (The costly thing we optimize with SIQS)
+        let a_inv = nt::mod_inverse((&a % p).complete().to_u64().unwrap(), p as u64);
         let b_mod_p = (&f.b % p).complete().to_u32().unwrap();
 
         let mut i = (((p + t - b_mod_p) as u64 * a_inv) % p as u64) as usize;

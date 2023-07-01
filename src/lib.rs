@@ -6,7 +6,7 @@ use rug::{integer::IsPrime, Complete, Integer};
 
 mod lanczos;
 mod linalg;
-mod mod_sqrt;
+mod nt;
 mod qs;
 
 #[derive(Debug)]
