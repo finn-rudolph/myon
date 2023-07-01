@@ -18,19 +18,34 @@ impl FactorBaseElem {
 }
 
 struct Relation {
-    y: Integer,
     ones: Vec<u32>,
+    y: Integer,
+    x: usize,
 }
 
-// Represents the polynomial (q^2 x + b)^2 - N.
+impl Relation {
+    fn new(x: usize, y: Integer, ones: Vec<u32>) -> Relation {
+        Relation { x, y, ones }
+    }
+}
+
+// Represents the polynomial (q^2 x + b)^2 - n.
 struct Polynomial {
     q: Integer,
     b: Integer,
+    a: Integer,
+    c: Integer,
+}
+
+impl Polynomial {
+    fn eval(&self, x: usize) -> Integer {
+        (&self.a * x).complete() + (x << 1) * &self.b + &self.c
+    }
 }
 
 fn smoothness_bound(n: &Integer) -> usize {
     let l = Float::parse(n.to_string()).unwrap().complete(512).ln();
-    (Float::exp(0.5 * l.clone().sqrt() * l.ln().sqrt()).to_f64() * 7.0) as usize
+    (Float::exp(0.5 * l.clone().sqrt() * l.ln().sqrt()).to_f64()) as usize
 }
 
 fn factor_base(n: &Integer, smoothness_bound: usize) -> Vec<FactorBaseElem> {
@@ -55,20 +70,65 @@ fn factor_base(n: &Integer, smoothness_bound: usize) -> Vec<FactorBaseElem> {
 }
 
 fn get_sieve_interval_len(smoothness_bound: usize) -> usize {
-    100 * smoothness_bound
+    7900 * smoothness_bound
 }
 
 fn ilog2_rounded(x: u32) -> u32 {
     ((x as u64 * x as u64).ilog2() + 1) >> 1
 }
 
-fn sieve(f: Polynomial, factor_base: &Vec<u32>, roots: &Vec<u32>, m: usize) -> Vec<Relation> {
-    let sieve_array: Vec<u8> = vec![0; m];
-    let relations: Vec<Relation> = vec![];
+fn sieve(f: Polynomial, factor_base: &Vec<FactorBaseElem>, m: usize) -> Vec<Relation> {
+    let mut sieve_array: Vec<u8> = vec![0; m];
 
-    for &p in factor_base {}
+    let a = f.q.clone().square();
 
-    todo!()
+    // Don't sieve with 2 for now.
+    for &FactorBaseElem { p, t } in factor_base.iter().skip(1) {
+        let log2p = ilog2_rounded(p) as u8;
+        let a_inv = mod_sqrt::mod_inverse((&a % p).complete().to_u64().unwrap(), p as u64);
+        let b_mod_p = (&f.b % p).complete().to_u32().unwrap();
+
+        let mut i = (((p + t - b_mod_p) as u64 * a_inv) % p as u64) as usize;
+        while i < m {
+            sieve_array[i] += log2p;
+            i += p as usize;
+        }
+
+        i = ((((p << 1) - t - b_mod_p) as u64 * a_inv) % p as u64) as usize;
+        while i < m {
+            sieve_array[i] += log2p;
+            i += p as usize;
+        }
+    }
+
+    let mut relations: Vec<Relation> = vec![];
+    const SIEVE_ERROR_LIMIT: u32 = 20;
+
+    for x in 0..m {
+        let mut y = f.eval(x);
+        let expected = y.significant_bits(); // log2(f(x))
+        if sieve_array[x] as u32 + SIEVE_ERROR_LIMIT >= expected {
+            // Candidate for a smooth relation.
+            let mut odd_exponent_indices: Vec<u32> = vec![];
+
+            for i in 0..factor_base.len() {
+                let mut odd_exponent = false;
+                while y.is_divisible_u(factor_base[i].p) {
+                    y.div_exact_u_mut(factor_base[i].p);
+                    odd_exponent = !odd_exponent;
+                }
+                if odd_exponent {
+                    odd_exponent_indices.push(i as u32);
+                }
+            }
+
+            if y == 1 {
+                relations.push(Relation::new(x, f.eval(x), odd_exponent_indices));
+            }
+        }
+    }
+
+    relations
 }
 
 // TODO: Measure accuracy of sieving heuristic with log.
