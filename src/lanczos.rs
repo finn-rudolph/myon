@@ -1,5 +1,4 @@
 use log::{info, warn};
-use rand_xoshiro::{rand_core::SeedableRng, Xoshiro256PlusPlus};
 
 use crate::linalg::{block_matrix, BlockMatrix, CscMatrix, N};
 
@@ -251,9 +250,8 @@ pub fn find_dependencies(b: &CscMatrix) -> (BlockMatrix, u32) {
 
     info!("solving linear system with {} rows and {} columns", m, n);
 
-    let mut xo = Xoshiro256PlusPlus::seed_from_u64(998244353);
     loop {
-        let (mut x, vm) = lanczos(b, &BlockMatrix::new_random(n, &mut xo));
+        let (mut x, vm) = lanczos(b, &BlockMatrix::new_random(n));
         x = combine_columns(b, x, vm);
         let mut u: u64 = 0;
         for i in 0..n {
@@ -283,12 +281,10 @@ mod tests {
 
     #[test]
     fn test_lanczos() {
-        let mut xo = Xoshiro256PlusPlus::seed_from_u64((1 << 61) - 1);
-
         for i in 0..116 {
             let n: usize = 197 + 5 * i;
             let m: usize = n - 19;
-            let b = CscMatrix::new_random(n, m, 17, &mut xo);
+            let b = CscMatrix::new_random(n, m, 17);
             let (x, num_dependencies) = find_dependencies(&b);
 
             assert!(num_dependencies != 0);

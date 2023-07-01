@@ -12,7 +12,7 @@ categories = ["algorithms", "mathematics"]
 
 [dependencies]
 log = "0.4.19"
-rand_xoshiro = "0.6.0"
+rand = "0.8.5"
 rug = "1.19.2"
 
 [dev-dependencies]

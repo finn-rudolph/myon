@@ -1,22 +1,46 @@
 use log::{error, info};
-use rand_xoshiro::{rand_core::SeedableRng, Xoshiro256PlusPlus};
 use rug::{ops::CompleteRound, Complete, Float, Integer};
 
 use crate::{lanczos, linalg::CscMatrix, mod_sqrt};
+
+struct FactorBaseElem {
+    p: u32,
+    t: u32, // One solution to t^2 = n mod p (the other one is just -t).
+}
+
+impl FactorBaseElem {
+    fn new(p: u32, n: &Integer) -> FactorBaseElem {
+        FactorBaseElem {
+            p,
+            t: mod_sqrt::mod_sqrt((n % p).complete().to_u64().unwrap(), p as u64) as u32,
+        }
+    }
+}
+
+struct Relation {
+    y: Integer,
+    ones: Vec<u32>,
+}
+
+// Represents the polynomial (q^2 x + b)^2 - N.
+struct Polynomial {
+    q: Integer,
+    b: Integer,
+}
 
 fn smoothness_bound(n: &Integer) -> usize {
     let l = Float::parse(n.to_string()).unwrap().complete(512).ln();
     (Float::exp(0.5 * l.clone().sqrt() * l.ln().sqrt()).to_f64() * 7.0) as usize
 }
 
-fn factor_base(n: &Integer, smoothness_bound: usize) -> Vec<u32> {
+fn factor_base(n: &Integer, smoothness_bound: usize) -> Vec<FactorBaseElem> {
     let mut is_prime: Vec<bool> = vec![1 != 0; smoothness_bound + 1];
-    let mut factor_base: Vec<u32> = vec![0; 0];
+    let mut factor_base: Vec<FactorBaseElem> = vec![];
 
     for i in 2..smoothness_bound + 1 {
         if is_prime[i] {
             if i & 1 == 0 || n.legendre(&Integer::from(i)) == 1 {
-                factor_base.push(i as u32);
+                factor_base.push(FactorBaseElem::new(i as u32, n));
             }
 
             let mut j = 2 * i;
@@ -36,6 +60,15 @@ fn get_sieve_interval_len(smoothness_bound: usize) -> usize {
 
 fn ilog2_rounded(x: u32) -> u32 {
     ((x as u64 * x as u64).ilog2() + 1) >> 1
+}
+
+fn sieve(f: Polynomial, factor_base: &Vec<u32>, roots: &Vec<u32>, m: usize) -> Vec<Relation> {
+    let sieve_array: Vec<u8> = vec![0; m];
+    let relations: Vec<Relation> = vec![];
+
+    for &p in factor_base {}
+
+    todo!()
 }
 
 // TODO: Measure accuracy of sieving heuristic with log.
@@ -69,14 +102,13 @@ pub fn factorize(n: &Integer) -> (Integer, Integer) {
     info!("initialized sieve array of length {}", m);
     let mut sieve_array: Vec<u8> = vec![0; m];
 
-    let mut xo = Xoshiro256PlusPlus::seed_from_u64(42);
     let sqrt_n: Integer = n.clone().sqrt() + 1;
 
     const SIEVE_ERROR_LIMIT: u32 = 80;
 
     for &p in &factor_base {
         let log2p = ilog2_rounded(p);
-        let t = mod_sqrt::mod_sqrt((n % p).complete().to_u64().unwrap(), p as u64, &mut xo) as u32;
+        let t = mod_sqrt::mod_sqrt((n % p).complete().to_u64().unwrap(), p as u64) as u32;
 
         let mut i: usize = ((t + p - (&sqrt_n % p).complete().to_u32().unwrap()) % p) as usize;
         while i < m {

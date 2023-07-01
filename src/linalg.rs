@@ -1,7 +1,7 @@
 use core::convert::From;
 use core::ops::{Index, IndexMut, Mul};
 
-use rand_xoshiro::{rand_core::RngCore, Xoshiro256PlusPlus};
+use rand::{thread_rng, Rng};
 
 pub const N: usize = 64;
 
@@ -50,24 +50,21 @@ impl CscMatrix {
         a
     }
 
-    pub fn new_random(
-        num_cols: usize,
-        num_rows: usize,
-        max_ones: usize,
-        xo: &mut Xoshiro256PlusPlus,
-    ) -> CscMatrix {
+    pub fn new_random(num_cols: usize, num_rows: usize, max_ones: usize) -> CscMatrix {
         let mut end: Vec<u32> = vec![0; 0];
         let mut ones: Vec<u32> = vec![0; 0];
         let mut used: Vec<bool> = vec![false; num_rows];
 
+        let mut rng = thread_rng();
+
         // Choose the number of nonzero entries for each column at random, then generate the indices
         // of 1s at random, avoiding duplicates in a column.
         for _ in 0..num_cols {
-            let weight = xo.next_u32() as usize % max_ones;
+            let weight = rng.gen_range(0..max_ones);
             for _ in 0..weight {
-                let mut x = xo.next_u32() % num_rows as u32;
+                let mut x = rng.gen_range(0..max_ones) as u32;
                 while used[x as usize] {
-                    x = xo.next_u32() % num_rows as u32;
+                    x = rng.gen_range(0..max_ones) as u32;
                 }
                 ones.push(x);
                 used[x as usize] = true;
@@ -101,11 +98,9 @@ impl CscMatrix {
 }
 
 impl BlockMatrix {
-    pub fn new_random(n: usize, xo: &mut Xoshiro256PlusPlus) -> BlockMatrix {
+    pub fn new_random(n: usize) -> BlockMatrix {
         let mut a = block_matrix![0; n];
-        for i in 0..n {
-            a[i] = xo.next_u64();
-        }
+        thread_rng().fill(&mut a.as_mut()[..]);
         a
     }
 

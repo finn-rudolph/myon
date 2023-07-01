@@ -1,4 +1,4 @@
-use rand_xoshiro::{rand_core::RngCore, Xoshiro256PlusPlus};
+use rand::{thread_rng, Rng, RngCore};
 
 // TODO: make this module generic
 //       If this module becomes a bottleneck, use something like LKK / Montgomery
@@ -27,7 +27,7 @@ const fn mod_inverse(a: u64, n: u64) -> u64 {
 
 // Finds a square root of a modulo p using the Tonelli-Shanks algorithm. a and p may not be greater
 // than u32::MAX, since multiplication is performed with them.
-pub fn mod_sqrt(mut a: u64, p: u64, xo: &mut Xoshiro256PlusPlus) -> u64 {
+pub fn mod_sqrt(mut a: u64, p: u64) -> u64 {
     assert!(a <= u32::MAX as u64);
     assert!(p <= u32::MAX as u64);
     if p == 2 {
@@ -41,10 +41,12 @@ pub fn mod_sqrt(mut a: u64, p: u64, xo: &mut Xoshiro256PlusPlus) -> u64 {
         return mod_exp(a, (p + 1) >> 2, p);
     }
 
+    let mut rng = thread_rng();
+
     // About 2 iterations are expected.
-    let mut b = xo.next_u64() % p;
-    while b == 0 || legendre(b, p) == 1 {
-        b = xo.next_u64() % p;
+    let mut b = rng.gen_range(2..p - 1);
+    while legendre(b, p) == 1 {
+        b = rng.gen_range(2..p - 1);
     }
 
     // Loop invariant: c = b ^ (2 ^ (k - 2)). Before the loop, k = 2, which is possible since p = 1
@@ -75,7 +77,6 @@ pub fn mod_sqrt(mut a: u64, p: u64, xo: &mut Xoshiro256PlusPlus) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand_xoshiro::{rand_core::SeedableRng, Xoshiro256PlusPlus};
 
     // Returns true, if (and only if? I'm not sure.) n is a prime. Works for numbers less than
     // u32::MAX.
@@ -105,9 +106,10 @@ mod tests {
     }
 
     // TODO: find better algorithm
-    fn gen_prime(xo: &mut Xoshiro256PlusPlus) -> u32 {
+    fn gen_prime() -> u32 {
+        let mut rng = thread_rng();
         loop {
-            let p = xo.next_u32();
+            let p = rng.next_u32();
             if is_prime(p as u64) {
                 return p;
             }
@@ -116,15 +118,14 @@ mod tests {
 
     #[test]
     fn test_tonelli_shanks() {
-        let mut xo = Xoshiro256PlusPlus::seed_from_u64(1000000009);
-
+        let mut rng = thread_rng();
         for _ in 0..10000 {
-            let p = gen_prime(&mut xo);
-            let mut a = xo.next_u32() % p;
+            let p = gen_prime();
+            let mut a = rng.gen_range(2..p - 1);
             while legendre(a as u64, p as u64) != 1 {
-                a = xo.next_u32() % p;
+                a = rng.gen_range(2..p - 1);
             }
-            let x = mod_sqrt(a as u64, p as u64, &mut xo);
+            let x = mod_sqrt(a as u64, p as u64);
             assert_eq!((x * x) % p as u64, a as u64);
         }
     }
