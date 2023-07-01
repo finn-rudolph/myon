@@ -74,44 +74,41 @@ pub fn mod_sqrt(mut a: u64, p: u64) -> u64 {
 
 // TODO: Add Cipolla's algorithm (it shall be faster sometimes?)
 
+// Returns true, if (and only if? I'm not sure.) n is a prime.
+pub fn is_prime(n: u32) -> bool {
+    const MILLER_RABIN_BASES: [u64; 3] = [15, 7363882082, 992620450144556];
+
+    let trailing_zeros = (n - 1).trailing_zeros();
+    let u = (n - 1) >> trailing_zeros;
+
+    for mut a in MILLER_RABIN_BASES {
+        a = a % n as u64;
+        let mut x = mod_exp(a, u as u64, n as u64);
+        for _ in 0..trailing_zeros {
+            let y = (x * x) % n as u64;
+            if y == 1 && x != 1 && x != n as u64 - 1 {
+                return false;
+            }
+            x = y;
+        }
+        if x != 1 {
+            return false;
+        }
+    }
+    true
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use rand::RngCore;
-
-    // Returns true, if (and only if? I'm not sure.) n is a prime. Works for numbers less than
-    // u32::MAX.
-    fn is_prime(n: u64) -> bool {
-        assert!(n <= u32::MAX as u64);
-
-        const MILLER_RABIN_BASES: [u64; 3] = [15, 7363882082, 992620450144556];
-
-        let trailing_zeros = (n - 1).trailing_zeros();
-        let u = (n - 1) >> trailing_zeros;
-
-        for mut a in MILLER_RABIN_BASES {
-            a = a % n;
-            let mut x = mod_exp(a, u, n);
-            for _ in 0..trailing_zeros {
-                let y = (x * x) % n;
-                if y == 1 && x != 1 && x != n - 1 {
-                    return false;
-                }
-                x = y;
-            }
-            if x != 1 {
-                return false;
-            }
-        }
-        true
-    }
 
     // TODO: find better algorithm
     fn gen_prime() -> u32 {
         let mut rng = thread_rng();
         loop {
             let p = rng.next_u32();
-            if is_prime(p as u64) {
+            if is_prime(p) {
                 return p;
             }
         }
