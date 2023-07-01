@@ -229,8 +229,8 @@ fn combine_columns(b: &CscMatrix, mut x: BlockMatrix, vm: BlockMatrix) -> BlockM
 
     for j in 0..n {
         x[j] = 0;
-        for k in i..N {
-            x[j] |= ((s[k][j / N] >> (j & (N - 1))) & 1) << (k - i);
+        for (k, row) in s.iter().enumerate().take(N).skip(i) {
+            x[j] |= ((row[j / N] >> (j & (N - 1))) & 1) << (k - i);
         }
     }
 
@@ -261,8 +261,8 @@ pub fn find_dependencies(b: &CscMatrix) -> (BlockMatrix, u32) {
         if u != 0 {
             // Verify that the vectors of y lie indeed in the nullspace.
             let z = b * &x;
-            for i in 0..m {
-                assert_eq!(z[i], 0);
+            for &v in z.as_ref() {
+                assert_eq!(v, 0);
             }
 
             info!(
@@ -282,15 +282,15 @@ mod tests {
     #[test]
     fn test_lanczos() {
         for i in 0..116 {
-            let n: usize = 197 + 5 * i;
-            let m: usize = n - 19;
+            let n: usize = 597 + 5 * i;
+            let m: usize = n - 39;
             let b = CscMatrix::new_random(n, m, 17);
             let (x, num_dependencies) = find_dependencies(&b);
 
             assert!(num_dependencies != 0);
             let r = &b * &x;
-            for i in 0..m {
-                assert_eq!(r[i], 0);
+            for &u in r.as_ref() {
+                assert_eq!(u, 0);
             }
         }
     }

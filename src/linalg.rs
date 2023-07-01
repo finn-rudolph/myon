@@ -51,8 +51,8 @@ impl CscMatrix {
     }
 
     pub fn new_random(num_cols: usize, num_rows: usize, max_ones: usize) -> CscMatrix {
-        let mut end: Vec<u32> = vec![0; 0];
-        let mut ones: Vec<u32> = vec![0; 0];
+        let mut end: Vec<u32> = vec![];
+        let mut ones: Vec<u32> = vec![];
         let mut used: Vec<bool> = vec![false; num_rows];
 
         let mut rng = thread_rng();
@@ -60,14 +60,14 @@ impl CscMatrix {
         // Choose the number of nonzero entries for each column at random, then generate the indices
         // of 1s at random, avoiding duplicates in a column.
         for _ in 0..num_cols {
-            let weight = rng.gen_range(0..max_ones);
+            let weight = rng.gen_range(0..=max_ones);
             for _ in 0..weight {
-                let mut x = rng.gen_range(0..max_ones) as u32;
-                while used[x as usize] {
-                    x = rng.gen_range(0..max_ones) as u32;
+                let mut x = rng.gen_range(0..=max_ones);
+                while used[x] {
+                    x = rng.gen_range(0..=max_ones);
                 }
-                ones.push(x);
-                used[x as usize] = true;
+                ones.push(x as u32);
+                used[x] = true;
             }
             end.push(ones.len() as u32);
             for i in 0..weight {
@@ -111,6 +111,7 @@ impl BlockMatrix {
     }
 
     // Calculates the transpose explicity as a two-dimensional vector, in row-major format.
+    // TODO: Optimize this to array of vectors?
     pub fn explicit_transpose(&self) -> Vec<Vec<u64>> {
         let n_words = (self.as_ref().len() + N - 1) / N;
         let mut res: Vec<Vec<u64>> = vec![vec![0; n_words]; N];

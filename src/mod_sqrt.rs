@@ -21,7 +21,7 @@ const fn legendre(a: u64, p: u64) -> u64 {
     mod_exp(a, (p - 1) >> 1, p)
 }
 
-const fn mod_inverse(a: u64, n: u64) -> u64 {
+pub const fn mod_inverse(a: u64, n: u64) -> u64 {
     mod_exp(a, n - 2, n)
 }
 
@@ -44,9 +44,9 @@ pub fn mod_sqrt(mut a: u64, p: u64) -> u64 {
     let mut rng = thread_rng();
 
     // About 2 iterations are expected.
-    let mut b = rng.gen_range(2..p - 1);
+    let mut b = rng.gen_range(2..p);
     while legendre(b, p) == 1 {
-        b = rng.gen_range(2..p - 1);
+        b = rng.gen_range(2..p);
     }
 
     // Loop invariant: c = b ^ (2 ^ (k - 2)). Before the loop, k = 2, which is possible since p = 1
@@ -122,9 +122,9 @@ mod tests {
         let mut rng = thread_rng();
         for _ in 0..10000 {
             let p = gen_prime();
-            let mut a = rng.gen_range(2..p - 1);
+            let mut a = rng.gen_range(2..p);
             while legendre(a as u64, p as u64) != 1 {
-                a = rng.gen_range(2..p - 1);
+                a = rng.gen_range(2..p);
             }
             let x = mod_sqrt(a as u64, p as u64);
             assert_eq!((x * x) % p as u64, a as u64);
