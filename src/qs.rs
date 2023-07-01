@@ -106,9 +106,8 @@ pub fn factorize(n: &Integer) -> (Integer, Integer) {
 
     const SIEVE_ERROR_LIMIT: u32 = 80;
 
-    for &p in &factor_base {
+    for &FactorBaseElem { p, t } in &factor_base {
         let log2p = ilog2_rounded(p);
-        let t = mod_sqrt::mod_sqrt((n % p).complete().to_u64().unwrap(), p as u64) as u32;
 
         let mut i: usize = ((t + p - (&sqrt_n % p).complete().to_u32().unwrap()) % p) as usize;
         while i < m {
@@ -143,8 +142,8 @@ pub fn factorize(n: &Integer) -> (Integer, Integer) {
 
             for i in 0..factor_base.len() {
                 let mut odd_exponent = false;
-                while y.is_divisible_u(factor_base[i]) {
-                    y.div_exact_u_mut(factor_base[i]);
+                while y.is_divisible_u(factor_base[i].p) {
+                    y.div_exact_u_mut(factor_base[i].p);
                     odd_exponent = !odd_exponent;
                 }
                 if odd_exponent {

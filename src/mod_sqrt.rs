@@ -1,4 +1,4 @@
-use rand::{thread_rng, Rng, RngCore};
+use rand::{thread_rng, Rng};
 
 // TODO: make this module generic
 //       If this module becomes a bottleneck, use something like LKK / Montgomery
@@ -77,6 +77,7 @@ pub fn mod_sqrt(mut a: u64, p: u64) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::RngCore;
 
     // Returns true, if (and only if? I'm not sure.) n is a prime. Works for numbers less than
     // u32::MAX.
