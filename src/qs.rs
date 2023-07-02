@@ -1,13 +1,7 @@
-use log::{error, info};
-use rand::{thread_rng, Rng};
+use log::{debug, error, info};
 use rug::{Complete, Integer};
 
-use crate::{
-    lanczos,
-    linalg::CscMatrix,
-    nt::{self, mod_inverse},
-    qs::params::factor_base_size,
-};
+use crate::{lanczos, linalg::CscMatrix, nt};
 
 mod params {
     use rug::Integer;
@@ -36,12 +30,12 @@ mod params {
     }
 
     const SIQS_PARAMS: [Params; 8] = [
-        Params::new(80_, 100_, 5000__, 4),
+        Params::new(80_, 100_, 5000__, 7),
         Params::new(100, 200_, 25000_, 4),
         Params::new(120, 400_, 25000_, 5),
         Params::new(140, 900_, 50000_, 5),
         Params::new(159, 1200, 100000, 6),
-        Params::new(179, 2000, 250000, 6),
+        Params::new(179, 2000, 250000, 11),
         Params::new(199, 3000, 350000, 7),
         Params::new(219, 4500, 500000, 7),
     ];
@@ -66,7 +60,8 @@ mod params {
     }
 
     pub fn q_order_of_mag(n: &Integer) -> u32 {
-        (n.significant_bits() - sieve_array_len(n).ilog2()) / polynomial_batch_size(n) as u32
+        1 << (n.significant_bits() / 2 - sieve_array_len(n).ilog2())
+            / polynomial_batch_size(n) as u32
     }
 }
 
@@ -105,15 +100,18 @@ impl Relation {
 
 // Represents the polynomial (q^2 x + b)^2 - n.
 struct Polynomial {
-    q: Integer,
-    b: Integer,
     a: Integer,
+    b: Integer,
     c: Integer,
 }
 
 impl Polynomial {
-    fn new(a: &Integer) -> Polynomial {
-        todo!()
+    fn new(a: &Integer, b: &Integer, n: &Integer) -> Polynomial {
+        Polynomial {
+            a: a.clone(),
+            b: b.clone(),
+            c: (b.clone().square() - n) / a,
+        }
     }
 
     fn eval(&self, x: usize) -> Integer {
@@ -152,33 +150,37 @@ fn ilog2_rounded(x: u32) -> u32 {
 // The sieve array contains for each x in [0; m] an approxipation of the sum of logarithms of
 // all primes in the factor base that divide (x + sqrt_n)^2 - n.
 
-fn sieve(f: Polynomial, factor_base: &Vec<FactorBaseElem>, m: usize) -> Vec<Relation> {
+fn sieve(
+    f: Polynomial,
+    m: usize,
+    factor_base: &Vec<FactorBaseElem>,
+    roots: &Vec<(u32, u32)>,
+) -> Vec<Relation> {
     let mut sieve_array: Vec<u8> = vec![0; m];
 
-    let a = f.q.clone().square();
-
     // Don't sieve with 2 for now.
-    for &FactorBaseElem { p, t } in factor_base.iter().skip(1) {
-        let log2p = ilog2_rounded(p) as u8;
-        // Initialization stage (The costly thing we optimize with SIQS)
-        let a_inv = nt::mod_inverse((&a % p).complete().to_u64().unwrap(), p as u64);
-        let b_mod_p = (&f.b % p).complete().to_u32().unwrap();
-
-        let mut i = (((p + t - b_mod_p) as u64 * a_inv) % p as u64) as usize;
-        while i < m {
-            sieve_array[i] += log2p;
-            i += p as usize;
+    for (i, &FactorBaseElem { p, t: _ }) in factor_base.iter().skip(1).enumerate() {
+        if f.a.is_divisible_u(p) {
+            continue;
         }
 
-        i = ((((p << 1) - t - b_mod_p) as u64 * a_inv) % p as u64) as usize;
-        while i < m {
-            sieve_array[i] += log2p;
-            i += p as usize;
+        let log2p = ilog2_rounded(p) as u8;
+
+        let mut j = roots[i].0 as usize;
+        while j < m {
+            sieve_array[j] += log2p;
+            j += p as usize;
+        }
+
+        j = roots[i].1 as usize;
+        while j < m {
+            sieve_array[j] += log2p;
+            j += p as usize;
         }
     }
 
     let mut relations: Vec<Relation> = vec![];
-    const SIEVE_ERROR_LIMIT: u32 = 20;
+    const SIEVE_ERROR_LIMIT: u32 = 80;
 
     for x in 0..m {
         let mut y = f.eval(x);
@@ -224,6 +226,8 @@ fn intialize_first(
     let q_order_of_mag = params::q_order_of_mag(n);
     let s = params::polynomial_batch_size(n);
 
+    // Choose a for the initial poylnomial as the product of s primes in the factor base with
+    // an order of magnitude such that a is approximately equal to sqrt(2n) / m.
     let k = match factor_base.binary_search_by_key(&q_order_of_mag, |e| e.p) {
         Ok(i) => i,
         Err(i) => i,
@@ -255,7 +259,7 @@ fn intialize_first(
         let a_inv = nt::mod_inverse((&a % p).complete().to_u32().unwrap() as u64, *p as u64);
         for j in 0..s {
             a_inv_d[j][i] =
-                (((&d[j] << 1u32).complete().to_u64().unwrap() * a_inv) % *p as u64) as u32;
+                ((((&d[j] << 1u32).complete() % p).to_u64().unwrap() * a_inv) % *p as u64) as u32;
         }
 
         let b_mod_p = (&b % p).complete().to_u32().unwrap();
@@ -274,11 +278,11 @@ fn initialize_next(
     a: &Integer,
     d: &Vec<Integer>,
     a_inv_d: &Vec<Vec<u32>>,
-    roots: &Vec<(u32, u32)>,
+    mut roots: Vec<(u32, u32)>,
     factor_base: &Vec<FactorBaseElem>,
 ) -> (Integer, Vec<(u32, u32)>) {
-    let nu = i.trailing_zeros() as usize + 1;
-    let positive_sign = ((i + (1 << nu) - 1) / (1 << nu)) & 1 == 1;
+    let nu = i.trailing_zeros() as usize;
+    let positive_sign = ((i + (1 << nu) - 1) / (1 << (nu + 1))) & 1 == 1;
 
     if positive_sign {
         b += (&d[nu] << 1u32).complete();
@@ -286,7 +290,6 @@ fn initialize_next(
         b -= (&d[nu] << 1u32).complete();
     }
 
-    let mut next_roots: Vec<(u32, u32)> = vec![(0u32, 0u32); factor_base.len()];
     for (i, FactorBaseElem { p, t: _ }) in factor_base.iter().enumerate() {
         // TODO: make this better
         if a.is_divisible_u(*p) {
@@ -294,19 +297,19 @@ fn initialize_next(
         }
         // TODO: SIMD, maybe move branch out of the loop
         if positive_sign {
-            next_roots[i] = (
+            roots[i] = (
                 (roots[i].0 + a_inv_d[nu][i]) % p,
                 (roots[i].1 + a_inv_d[nu][i]) % p,
             );
         } else {
-            next_roots[i] = (
+            roots[i] = (
                 (p + roots[i].0 - a_inv_d[nu][i]) % p,
                 (p + roots[i].1 - a_inv_d[nu][i]) % p,
             );
         }
     }
 
-    (b, next_roots)
+    (b, roots)
 }
 
 // TODO: Measure accuracy of sieving heuristic with log.
@@ -324,11 +327,25 @@ pub fn factorize(n: &Integer) -> (Integer, Integer) {
 
     let m = params::sieve_array_len(n);
     let s = params::polynomial_batch_size(n);
-
     let mut relations: Vec<Relation> = vec![];
-    while relations.len() <= factor_base.len() {
-        // Choose a for the initial poylnomial as the product of s primes in the factor base with
-        // an order of magnitude such that a is approximately equal to sqrt(2n) / m.
+    let (a, mut b, d, a_inv_d, mut roots) = intialize_first(n, &factor_base);
+
+    debug!(
+        "chose leading coefficient a = {} ({} bits). should have around {} bits.",
+        a,
+        a.significant_bits(),
+        n.significant_bits() / 2 - params::sieve_array_len(n).ilog2()
+    );
+
+    for i in 1..(1 << (s - 1)) {
+        let f = Polynomial::new(&a, &b, n);
+        relations.append(&mut sieve(f, m, &factor_base, &roots));
+        debug!("size : {}", relations.len());
+        (b, roots) = initialize_next(i, b, &a, &d, &a_inv_d, roots, &factor_base);
+
+        if relations.len() > factor_base.len() {
+            break;
+        }
     }
 
     info!(
