@@ -21,8 +21,8 @@ const fn legendre(a: u64, p: u64) -> u64 {
     mod_exp(a, (p - 1) >> 1, p)
 }
 
-pub const fn mod_inverse(a: u64, n: u64) -> u64 {
-    mod_exp(a, n - 2, n)
+pub const fn mod_inverse(a: u64, p: u64) -> u64 {
+    mod_exp(a, p - 2, p)
 }
 
 // Finds a square root of a modulo p using the Tonelli-Shanks algorithm. a and p may not be greater

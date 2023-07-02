@@ -1,21 +1,27 @@
-use log::{error, info, STATIC_MAX_LEVEL};
-use rug::{ops::CompleteRound, Complete, Float, Integer};
+use log::{error, info};
+use rand::{thread_rng, Rng};
+use rug::{Complete, Integer};
 
-use crate::{lanczos, linalg::CscMatrix, nt};
+use crate::{
+    lanczos,
+    linalg::CscMatrix,
+    nt::{self, mod_inverse},
+    qs::params::factor_base_size,
+};
 
 mod params {
     use rug::Integer;
 
     struct Params {
-        bits: usize,
+        bits: u32,
         factor_base_size: usize,
         sieve_array_len: usize,
         polynomial_batch_size: usize,
     }
 
     impl Params {
-        fn new(
-            bits: usize,
+        const fn new(
+            bits: u32,
             factor_base_size: usize,
             sieve_array_len: usize,
             polynomial_batch_size: usize,
@@ -41,18 +47,10 @@ mod params {
     ];
 
     fn search_index(n: &Integer) -> usize {
-        let bits = n.significant_bits();
-        let (mut a, mut b) = (0, SIQS_PARAMS.len() - 1);
-        while a < b {
-            let mid = (a + b) / 2;
-            if SIQS_PARAMS[mid].bits <= bits as usize {
-                b = mid;
-            } else {
-                a = mid + 1;
-            }
+        match SIQS_PARAMS.binary_search_by_key(&n.significant_bits(), |p| p.bits) {
+            Ok(i) => i,
+            Err(i) => i,
         }
-
-        a
     }
 
     pub fn factor_base_size(n: &Integer) -> usize {
@@ -65,6 +63,10 @@ mod params {
 
     pub fn polynomial_batch_size(n: &Integer) -> usize {
         SIQS_PARAMS[search_index(n)].polynomial_batch_size
+    }
+
+    pub fn q_order_of_mag(n: &Integer) -> u32 {
+        (n.significant_bits() - sieve_array_len(n).ilog2()) / polynomial_batch_size(n) as u32
     }
 }
 
@@ -110,7 +112,9 @@ struct Polynomial {
 }
 
 impl Polynomial {
-    fn new(a: &Integer) -> Polynomial {}
+    fn new(a: &Integer) -> Polynomial {
+        todo!()
+    }
 
     fn eval(&self, x: usize) -> Integer {
         (&self.a * x).complete() + (x << 1) * &self.b + &self.c
@@ -207,6 +211,54 @@ fn sieve(f: Polynomial, factor_base: &Vec<FactorBaseElem>, m: usize) -> Vec<Rela
     relations
 }
 
+fn intialize(
+    n: &Integer,
+    factor_base: &Vec<FactorBaseElem>,
+) -> (Integer, Integer, Vec<Integer>, Vec<Vec<u32>>) {
+    let q_order_of_mag = params::q_order_of_mag(n);
+    let s = params::polynomial_batch_size(n);
+
+    let k = match factor_base.binary_search_by_key(&q_order_of_mag, |e| e.p) {
+        Ok(i) => i,
+        Err(i) => i,
+    };
+
+    let mut a = Integer::from(1);
+    let mut d: Vec<Integer> = vec![Integer::new(); s];
+    for i in 0..s {
+        let q = factor_base[k + i].p;
+        a *= q;
+        let mut gamma = ((factor_base[k + i].t as u64
+            * nt::mod_inverse(((&a / q).complete() % q).to_u64().unwrap(), q as u64))
+            % q as u64) as u32;
+        if gamma > q / 2 {
+            gamma = q - gamma;
+        }
+        d[i] = (&a / q).complete() * gamma;
+    }
+
+    let mut a_inv_d: Vec<Vec<u32>> = vec![vec![0; factor_base.len()]; s];
+    for (i, FactorBaseElem { p, t: _ }) in factor_base.iter().enumerate() {
+        if a.is_divisible_u(*p) {
+            continue;
+        }
+
+        let a_inv = nt::mod_inverse((&a % p).complete().to_u32().unwrap() as u64, *p as u64);
+        for j in 0..s {
+            a_inv_d[j][i] =
+                (((&d[j] << 1u32).complete().to_u64().unwrap() * a_inv as u64) % *p as u64) as u32;
+        }
+    }
+
+    let b: Integer = d.iter().sum();
+
+    (a, b, d, a_inv_d)
+}
+
+fn next_polynomial() -> Polynomial {
+    todo!()
+}
+
 // TODO: Measure accuracy of sieving heuristic with log.
 // TODO: Sieve with prime powers.
 pub fn factorize(n: &Integer) -> (Integer, Integer) {
@@ -221,15 +273,12 @@ pub fn factorize(n: &Integer) -> (Integer, Integer) {
     );
 
     let m = params::sieve_array_len(n);
+    let s = params::polynomial_batch_size(n);
 
     let mut relations: Vec<Relation> = vec![];
-    let mut q: Integer = ((n << 1u32).complete().sqrt() / m).sqrt().next_prime();
     while relations.len() <= factor_base.len() {
-        while n.legendre(&q) != 1 {
-            q = q.next_prime();
-        }
-
-        q = q.next_prime();
+        // Choose a for the initial poylnomial as the product of s primes in the factor base with
+        // an order of magnitude such that a is approximately equal to sqrt(2n) / m.
     }
 
     info!(
