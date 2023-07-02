@@ -211,10 +211,16 @@ fn sieve(f: Polynomial, factor_base: &Vec<FactorBaseElem>, m: usize) -> Vec<Rela
     relations
 }
 
-fn intialize(
+fn intialize_first(
     n: &Integer,
     factor_base: &Vec<FactorBaseElem>,
-) -> (Integer, Integer, Vec<Integer>, Vec<Vec<u32>>) {
+) -> (
+    Integer,
+    Integer,
+    Vec<Integer>,
+    Vec<Vec<u32>>,
+    Vec<(u32, u32)>,
+) {
     let q_order_of_mag = params::q_order_of_mag(n);
     let s = params::polynomial_batch_size(n);
 
@@ -238,7 +244,10 @@ fn intialize(
     }
 
     let mut a_inv_d: Vec<Vec<u32>> = vec![vec![0; factor_base.len()]; s];
-    for (i, FactorBaseElem { p, t: _ }) in factor_base.iter().enumerate() {
+    let mut roots: Vec<(u32, u32)> = vec![(0u32, 0u32); factor_base.len()];
+    let b: Integer = d.iter().sum();
+
+    for (i, FactorBaseElem { p, t }) in factor_base.iter().enumerate() {
         if a.is_divisible_u(*p) {
             continue;
         }
@@ -246,17 +255,58 @@ fn intialize(
         let a_inv = nt::mod_inverse((&a % p).complete().to_u32().unwrap() as u64, *p as u64);
         for j in 0..s {
             a_inv_d[j][i] =
-                (((&d[j] << 1u32).complete().to_u64().unwrap() * a_inv as u64) % *p as u64) as u32;
+                (((&d[j] << 1u32).complete().to_u64().unwrap() * a_inv) % *p as u64) as u32;
+        }
+
+        let b_mod_p = (&b % p).complete().to_u32().unwrap();
+        roots[i] = (
+            ((a_inv * (t + p - b_mod_p) as u64) % *p as u64) as u32,
+            ((a_inv * (p - t + p - b_mod_p) as u64) % *p as u64) as u32,
+        )
+    }
+
+    (a, b, d, a_inv_d, roots)
+}
+
+fn initialize_next(
+    i: usize,
+    mut b: Integer,
+    a: &Integer,
+    d: &Vec<Integer>,
+    a_inv_d: &Vec<Vec<u32>>,
+    roots: &Vec<(u32, u32)>,
+    factor_base: &Vec<FactorBaseElem>,
+) -> (Integer, Vec<(u32, u32)>) {
+    let nu = i.trailing_zeros() as usize + 1;
+    let positive_sign = ((i + (1 << nu) - 1) / (1 << nu)) & 1 == 1;
+
+    if positive_sign {
+        b += (&d[nu] << 1u32).complete();
+    } else {
+        b -= (&d[nu] << 1u32).complete();
+    }
+
+    let mut next_roots: Vec<(u32, u32)> = vec![(0u32, 0u32); factor_base.len()];
+    for (i, FactorBaseElem { p, t: _ }) in factor_base.iter().enumerate() {
+        // TODO: make this better
+        if a.is_divisible_u(*p) {
+            continue;
+        }
+        // TODO: SIMD, maybe move branch out of the loop
+        if positive_sign {
+            next_roots[i] = (
+                (roots[i].0 + a_inv_d[nu][i]) % p,
+                (roots[i].1 + a_inv_d[nu][i]) % p,
+            );
+        } else {
+            next_roots[i] = (
+                (p + roots[i].0 - a_inv_d[nu][i]) % p,
+                (p + roots[i].1 - a_inv_d[nu][i]) % p,
+            );
         }
     }
 
-    let b: Integer = d.iter().sum();
-
-    (a, b, d, a_inv_d)
-}
-
-fn next_polynomial() -> Polynomial {
-    todo!()
+    (b, next_roots)
 }
 
 // TODO: Measure accuracy of sieving heuristic with log.
