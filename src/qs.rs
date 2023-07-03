@@ -1,5 +1,5 @@
 use log::{debug, error, info};
-use rug::{Complete, Integer};
+use rug::{ops::NegAssign, Complete, Integer};
 
 use crate::{lanczos, linalg::CscMatrix, nt};
 
@@ -30,12 +30,12 @@ mod params {
     }
 
     const SIQS_PARAMS: [Params; 8] = [
-        Params::new(80_, 100_, 5000__, 7),
+        Params::new(80_, 100_, 5000__, 4),
         Params::new(100, 200_, 25000_, 4),
         Params::new(120, 400_, 25000_, 5),
-        Params::new(140, 900_, 50000_, 5),
-        Params::new(159, 1200, 100000, 6),
-        Params::new(179, 2000, 250000, 11),
+        Params::new(140, 1000, 50000_, 5),
+        Params::new(159, 2500, 100000, 6),
+        Params::new(179, 3000, 250000, 6),
         Params::new(199, 3000, 350000, 7),
         Params::new(219, 4500, 500000, 7),
     ];
@@ -101,7 +101,7 @@ impl Polynomial {
     }
 
     fn eval(&self, x: usize) -> Integer {
-        (&self.a * x).complete() + (x << 1) * &self.b + &self.c
+        (&self.a * (x * x)).complete() + (x << 1) * &self.b + &self.c
     }
 }
 
@@ -136,6 +136,48 @@ fn ilog2_rounded(x: u32) -> u32 {
 // The sieve array contains for each x in [0; m] an approxipation of the sum of logarithms of
 // all primes in the factor base that divide (x + sqrt_n)^2 - n.
 
+fn trial_divide(sieve_array: Vec<u8>, factor_base: &Vec<u32>, f: Polynomial) -> Vec<Relation> {
+    let mut relations: Vec<Relation> = vec![];
+    const SIEVE_ERROR_LIMIT: u32 = 100;
+
+    for x in 0..sieve_array.len() {
+        let mut y = f.eval(x);
+        let expected = y.significant_bits(); // log2(f(x))
+
+        if true || sieve_array[x] as u32 + SIEVE_ERROR_LIMIT >= expected {
+            // Candidate for a smooth relation.
+            let mut odd_exponent_indices: Vec<u32> = vec![];
+
+            if y < 0 {
+                y.neg_assign();
+                odd_exponent_indices.push(0);
+            }
+
+            for i in 0..factor_base.len() {
+                let mut odd_exponent = false;
+                while y.is_divisible_u(factor_base[i]) {
+                    y.div_exact_u_mut(factor_base[i]);
+                    odd_exponent = !odd_exponent;
+                }
+                if odd_exponent {
+                    // The first row belongs to -1, so shift all indices by 1 up.
+                    odd_exponent_indices.push(i as u32 + 1);
+                }
+            }
+
+            if y == 1 {
+                relations.push(Relation::new(
+                    (&f.a * x).complete() + &f.b,
+                    f.eval(x),
+                    odd_exponent_indices,
+                ));
+            }
+        }
+    }
+
+    relations
+}
+
 fn sieve(
     f: Polynomial,
     m: usize,
@@ -165,39 +207,7 @@ fn sieve(
         }
     }
 
-    let mut relations: Vec<Relation> = vec![];
-    const SIEVE_ERROR_LIMIT: u32 = 80;
-
-    for x in 0..m {
-        // TODO: handle negative stuff...
-        let mut y = f.eval(x);
-        let expected = y.significant_bits(); // log2(f(x))
-        if sieve_array[x] as u32 + SIEVE_ERROR_LIMIT >= expected {
-            // Candidate for a smooth relation.
-            let mut odd_exponent_indices: Vec<u32> = vec![];
-
-            for i in 0..factor_base.len() {
-                let mut odd_exponent = false;
-                while y.is_divisible_u(factor_base[i]) {
-                    y.div_exact_u_mut(factor_base[i]);
-                    odd_exponent = !odd_exponent;
-                }
-                if odd_exponent {
-                    odd_exponent_indices.push(i as u32);
-                }
-            }
-
-            if y == 1 {
-                relations.push(Relation::new(
-                    (&f.a * x).complete() + &f.b,
-                    f.eval(x),
-                    odd_exponent_indices,
-                ));
-            }
-        }
-    }
-
-    relations
+    trial_divide(sieve_array, factor_base, f)
 }
 
 fn intialize_first(
@@ -309,11 +319,15 @@ pub fn factorize(n: &Integer) -> (Integer, Integer) {
     assert!(!n.is_even());
     assert!(!n.is_perfect_power());
 
-    info!("factor base size set to {}", params::factor_base_size(n));
     let factor_base = factor_base(n, params::factor_base_size(n));
     info!(
         "chose a factor base consisting of {} primes",
         factor_base.len()
+    );
+    debug!("{:?}", factor_base);
+    info!(
+        "largest prime in the factor base: {}",
+        factor_base.last().unwrap()
     );
 
     let m = params::sieve_array_len(n);
@@ -346,7 +360,7 @@ pub fn factorize(n: &Integer) -> (Integer, Integer) {
 
     let (x, num_dependencies) = lanczos::find_dependencies(&CscMatrix::new(
         relations.iter().map(|r| r.ones.clone()).collect(),
-        factor_base.len(),
+        factor_base.len() + 1,
     ));
     for i in 0..num_dependencies {
         let (mut a_squared, mut b) = (Integer::from(1), Integer::from(1));
