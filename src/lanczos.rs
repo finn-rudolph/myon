@@ -136,7 +136,7 @@ fn lanczos(b: &CscMatrix, y: &BlockMatrix) -> (BlockMatrix, BlockMatrix) {
         assert!(w_inv.is_symmetric());
 
         if total_d + N < m && previous_d | d != !0u64 {
-            warn!("Some vectors of v_(i - 1) not included in w_(i - 1) were not included in w_i.");
+            warn!("some vectors of v_(i - 1) not included in w_(i - 1) were not included in w_i");
         }
         total_d += d.count_ones() as usize;
 
@@ -243,7 +243,7 @@ pub fn find_dependencies(b: &CscMatrix) -> (BlockMatrix, u32) {
 
     assert!(
         m < n,
-        "matrix has {} rows but only {} columns, so dependencies might not exist.",
+        "matrix has {} rows but only {} columns, so dependencies might not exist",
         m,
         n
     );
