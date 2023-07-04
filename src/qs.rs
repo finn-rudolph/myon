@@ -1,4 +1,4 @@
-use log::{debug, error, info};
+use log::{error, info};
 use rug::{ops::NegAssign, Complete, Integer};
 
 use crate::{lanczos, linalg::CscMatrix, nt};
@@ -30,10 +30,10 @@ mod params {
     }
 
     const SIQS_PARAMS: [Params; 8] = [
-        Params::new(80_, 100_, 5000__, 4),
+        Params::new(80_, 100_, 500000__, 4),
         Params::new(100, 200_, 25000_, 4),
         Params::new(120, 400_, 25000_, 5),
-        Params::new(140, 1000, 50000_, 5),
+        Params::new(140, 1000, 50000_, 8),
         Params::new(159, 2500, 100000, 6),
         Params::new(179, 3000, 250000, 6),
         Params::new(199, 3000, 350000, 7),
@@ -60,8 +60,8 @@ mod params {
     }
 
     pub fn q_order_of_mag(n: &Integer) -> u32 {
-        1 << (n.significant_bits() / 2 - sieve_array_len(n).ilog2())
-            / polynomial_batch_size(n) as u32
+        1 << ((n.significant_bits() / 2 - sieve_array_len(n).ilog2())
+            / polynomial_batch_size(n) as u32)
     }
 }
 
@@ -101,7 +101,7 @@ impl Polynomial {
     }
 
     fn eval(&self, x: usize) -> Integer {
-        (&self.a * (x * x)).complete() + (x << 1) * &self.b + &self.c
+        (&self.a * (x * x)).complete() + &self.b * (x << 1) + &self.c
     }
 }
 
@@ -119,8 +119,110 @@ fn factor_base(n: &Integer, factor_base_size: usize) -> Vec<u32> {
     factor_base
 }
 
-fn ilog2_rounded(x: u32) -> u32 {
-    ((x as u64 * x as u64).ilog2() + 1) >> 1
+fn intialize_first(
+    n: &Integer,
+    factor_base: &Vec<u32>,
+) -> (
+    Integer,
+    Integer,
+    Vec<Integer>,
+    Vec<Vec<u32>>,
+    Vec<(u32, u32)>,
+) {
+    let mut t: Vec<u32> = vec![0; factor_base.len()];
+    for (i, &p) in factor_base.iter().enumerate() {
+        t[i] = nt::mod_sqrt((n % p).complete().to_u64().unwrap(), p as u64) as u32;
+    }
+
+    let s = params::polynomial_batch_size(n);
+
+    // Choose a for the initial poylnomial as the product of s primes in the factor base with
+    // an order of magnitude such that a is approximately equal to sqrt(2n) / m.
+    let k = match factor_base.binary_search(&params::q_order_of_mag(n)) {
+        Ok(i) => i,
+        Err(i) => i,
+    };
+
+    let a: Integer = factor_base[k..k + s]
+        .iter()
+        .map(|&x| Integer::from(x))
+        .product();
+    let mut d: Vec<Integer> = vec![Integer::new(); s];
+
+    for i in 0..s {
+        let q = factor_base[k + i];
+        let mut gamma = ((t[k + i] as u64
+            * nt::mod_inverse(((&a / q).complete() % q).to_u64().unwrap(), q as u64))
+            % q as u64) as u32;
+        if gamma > q / 2 {
+            gamma = q - gamma;
+        }
+        d[i] = (&a / q).complete() * gamma;
+    }
+
+    let mut a_inv_d: Vec<Vec<u32>> = vec![vec![0; factor_base.len()]; s];
+    let mut roots: Vec<(u32, u32)> = vec![(0, 0); factor_base.len()];
+    let b: Integer = d.iter().sum();
+
+    for (i, &p) in factor_base.iter().enumerate() {
+        if a.is_divisible_u(p) {
+            continue;
+        }
+
+        let a_inv = nt::mod_inverse((&a % p).complete().to_u32().unwrap() as u64, p as u64);
+        for j in 0..s {
+            a_inv_d[j][i] =
+                ((((&d[j] << 1u32).complete() % p).to_u64().unwrap() * a_inv) % p as u64) as u32;
+        }
+
+        let b_mod_p = (&b % p).complete().to_u32().unwrap();
+        roots[i] = (
+            ((a_inv * (t[i] + p - b_mod_p) as u64) % p as u64) as u32,
+            ((a_inv * (p - t[i] + p - b_mod_p) as u64) % p as u64) as u32,
+        )
+    }
+
+    (a, b, d, a_inv_d, roots)
+}
+
+fn initialize_next(
+    i: usize,
+    mut b: Integer,
+    a: &Integer,
+    d: &Vec<Integer>,
+    a_inv_d: &Vec<Vec<u32>>,
+    mut roots: Vec<(u32, u32)>,
+    factor_base: &Vec<u32>,
+) -> (Integer, Vec<(u32, u32)>) {
+    let nu = i.trailing_zeros() as usize;
+    let positive_sign = ((i + (1 << (nu + 1)) - 1) / (1 << (nu + 1))) & 1 == 1;
+
+    if positive_sign {
+        b += (&d[nu] << 1u32).complete();
+    } else {
+        b -= (&d[nu] << 1u32).complete();
+    }
+
+    for (i, &p) in factor_base.iter().enumerate() {
+        // TODO: make this better
+        if a.is_divisible_u(p) {
+            continue;
+        }
+        // TODO: SIMD, maybe move branch out of the loop
+        if positive_sign {
+            roots[i] = (
+                (roots[i].0 + a_inv_d[nu][i]) % p,
+                (roots[i].1 + a_inv_d[nu][i]) % p,
+            );
+        } else {
+            roots[i] = (
+                (p + roots[i].0 - a_inv_d[nu][i]) % p,
+                (p + roots[i].1 - a_inv_d[nu][i]) % p,
+            );
+        }
+    }
+
+    (b, roots)
 }
 
 // IDEA: use SIMD gather to increment a bunch of sieve values at once? Probably not helpful
@@ -138,13 +240,13 @@ fn ilog2_rounded(x: u32) -> u32 {
 
 fn trial_divide(sieve_array: Vec<u8>, factor_base: &Vec<u32>, f: Polynomial) -> Vec<Relation> {
     let mut relations: Vec<Relation> = vec![];
-    const SIEVE_ERROR_LIMIT: u32 = 100;
+    const SIEVE_ERROR_LIMIT: u32 = 60;
 
-    for x in 0..sieve_array.len() {
+    for x in 1..sieve_array.len() {
         let mut y = f.eval(x);
         let expected = y.significant_bits(); // log2(f(x))
 
-        if true || sieve_array[x] as u32 + SIEVE_ERROR_LIMIT >= expected {
+        if sieve_array[x] as u32 + SIEVE_ERROR_LIMIT >= expected {
             // Candidate for a smooth relation.
             let mut odd_exponent_indices: Vec<u32> = vec![];
 
@@ -154,12 +256,8 @@ fn trial_divide(sieve_array: Vec<u8>, factor_base: &Vec<u32>, f: Polynomial) -> 
             }
 
             for i in 0..factor_base.len() {
-                let mut odd_exponent = false;
-                while y.is_divisible_u(factor_base[i]) {
-                    y.div_exact_u_mut(factor_base[i]);
-                    odd_exponent = !odd_exponent;
-                }
-                if odd_exponent {
+                let exponent = y.remove_factor_mut(&Integer::from(factor_base[i]));
+                if exponent & 1 == 1 {
                     // The first row belongs to -1, so shift all indices by 1 up.
                     odd_exponent_indices.push(i as u32 + 1);
                 }
@@ -176,6 +274,10 @@ fn trial_divide(sieve_array: Vec<u8>, factor_base: &Vec<u32>, f: Polynomial) -> 
     }
 
     relations
+}
+
+fn ilog2_rounded(x: u32) -> u32 {
+    ((x as u64 * x as u64).ilog2() + 1) >> 1
 }
 
 fn sieve(
@@ -210,109 +312,6 @@ fn sieve(
     trial_divide(sieve_array, factor_base, f)
 }
 
-fn intialize_first(
-    n: &Integer,
-    factor_base: &Vec<u32>,
-) -> (
-    Integer,
-    Integer,
-    Vec<Integer>,
-    Vec<Vec<u32>>,
-    Vec<(u32, u32)>,
-) {
-    let mut t: Vec<u32> = vec![0; factor_base.len()];
-    for (i, &p) in factor_base.iter().enumerate() {
-        t[i] = nt::mod_sqrt((n % p).complete().to_u64().unwrap(), p as u64) as u32;
-    }
-
-    let s = params::polynomial_batch_size(n);
-
-    // Choose a for the initial poylnomial as the product of s primes in the factor base with
-    // an order of magnitude such that a is approximately equal to sqrt(2n) / m.
-    let k = match factor_base.binary_search(&params::q_order_of_mag(n)) {
-        Ok(i) => i,
-        Err(i) => i,
-    };
-
-    let mut a = Integer::from(1);
-    let mut d: Vec<Integer> = vec![Integer::new(); s];
-    for i in 0..s {
-        let q = factor_base[k + i];
-        a *= q;
-        let mut gamma = ((t[k + i] as u64
-            * nt::mod_inverse(((&a / q).complete() % q).to_u64().unwrap(), q as u64))
-            % q as u64) as u32;
-        if gamma > q / 2 {
-            gamma = q - gamma;
-        }
-        d[i] = (&a / q).complete() * gamma;
-    }
-
-    let mut a_inv_d: Vec<Vec<u32>> = vec![vec![0; factor_base.len()]; s];
-    let mut roots: Vec<(u32, u32)> = vec![(0u32, 0u32); factor_base.len()];
-    let b: Integer = d.iter().sum();
-
-    for (i, &p) in factor_base.iter().enumerate() {
-        if a.is_divisible_u(p) {
-            continue;
-        }
-
-        let a_inv = nt::mod_inverse((&a % p).complete().to_u32().unwrap() as u64, p as u64);
-        for j in 0..s {
-            a_inv_d[j][i] =
-                ((((&d[j] << 1u32).complete() % p).to_u64().unwrap() * a_inv) % p as u64) as u32;
-        }
-
-        let b_mod_p = (&b % p).complete().to_u32().unwrap();
-        roots[i] = (
-            ((a_inv * (t[i] + p - b_mod_p) as u64) % p as u64) as u32,
-            ((a_inv * (p - t[i] + p - b_mod_p) as u64) % p as u64) as u32,
-        )
-    }
-
-    (a, b, d, a_inv_d, roots)
-}
-
-fn initialize_next(
-    i: usize,
-    mut b: Integer,
-    a: &Integer,
-    d: &Vec<Integer>,
-    a_inv_d: &Vec<Vec<u32>>,
-    mut roots: Vec<(u32, u32)>,
-    factor_base: &Vec<u32>,
-) -> (Integer, Vec<(u32, u32)>) {
-    let nu = i.trailing_zeros() as usize;
-    let positive_sign = ((i + (1 << nu) - 1) / (1 << (nu + 1))) & 1 == 1;
-
-    if positive_sign {
-        b += (&d[nu] << 1u32).complete();
-    } else {
-        b -= (&d[nu] << 1u32).complete();
-    }
-
-    for (i, &p) in factor_base.iter().enumerate() {
-        // TODO: make this better
-        if a.is_divisible_u(p) {
-            continue;
-        }
-        // TODO: SIMD, maybe move branch out of the loop
-        if positive_sign {
-            roots[i] = (
-                (roots[i].0 + a_inv_d[nu][i]) % p,
-                (roots[i].1 + a_inv_d[nu][i]) % p,
-            );
-        } else {
-            roots[i] = (
-                (p + roots[i].0 - a_inv_d[nu][i]) % p,
-                (p + roots[i].1 - a_inv_d[nu][i]) % p,
-            );
-        }
-    }
-
-    (b, roots)
-}
-
 // TODO: Measure accuracy of sieving heuristic with log.
 // TODO: Sieve with prime powers.
 pub fn factorize(n: &Integer) -> (Integer, Integer) {
@@ -324,7 +323,6 @@ pub fn factorize(n: &Integer) -> (Integer, Integer) {
         "chose a factor base consisting of {} primes",
         factor_base.len()
     );
-    debug!("{:?}", factor_base);
     info!(
         "largest prime in the factor base: {}",
         factor_base.last().unwrap()
@@ -335,7 +333,7 @@ pub fn factorize(n: &Integer) -> (Integer, Integer) {
     let mut relations: Vec<Relation> = vec![];
     let (a, mut b, d, a_inv_d, mut roots) = intialize_first(n, &factor_base);
 
-    debug!(
+    info!(
         "chose leading coefficient a = {} ({} bits). should have around {} bits.",
         a,
         a.significant_bits(),
@@ -345,10 +343,9 @@ pub fn factorize(n: &Integer) -> (Integer, Integer) {
     for i in 1..(1 << (s - 1)) {
         let f = Polynomial::new(&a, &b, n);
         relations.append(&mut sieve(f, m, &factor_base, &roots));
-        debug!("size : {}", relations.len());
         (b, roots) = initialize_next(i, b, &a, &d, &a_inv_d, roots, &factor_base);
 
-        if relations.len() > factor_base.len() {
+        if relations.len() > factor_base.len() + 1 {
             break;
         }
     }
