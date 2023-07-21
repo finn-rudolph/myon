@@ -5,43 +5,7 @@ use rug::{
     Complete, Integer,
 };
 
-use crate::{linalg::CscMatrixBuilder, nt};
-
-#[derive(Clone, Copy)]
-struct Params {
-    rational_base_size: usize,
-    algebraic_base_size: usize,
-    quad_char_base_size: usize,
-    polynomial_degree: u32,
-    sieve_array_size: usize,
-    fudge: i8, // different fudge for rational and algebraic side?
-}
-
-impl Params {
-    const PARAM_TABLE: [(u32, Params); 1] = [(
-        128,
-        Params {
-            rational_base_size: 500,
-            algebraic_base_size: 500,
-            quad_char_base_size: 100,
-            polynomial_degree: 3,
-            sieve_array_size: 10000,
-            fudge: 20,
-        },
-    )];
-
-    fn new(n: &Integer) -> Params {
-        let bits = n.significant_bits();
-
-        for (bits_lim, params) in Params::PARAM_TABLE.iter().rev() {
-            if bits <= *bits_lim {
-                return *params;
-            }
-        }
-
-        Params::PARAM_TABLE.last().unwrap().1
-    }
-}
+use crate::{linalg::CscMatrixBuilder, nt, params::Params};
 
 fn rational_factor_base(m: &Integer, params: &Params) -> Vec<(u32, u32)> {
     let mut base: Vec<(u32, u32)> = Vec::new();
@@ -178,7 +142,7 @@ pub fn factorize(r: u32, e: u32, s: i32) -> Integer {
                     }
                 }
 
-                // Trial divide on the algrbraic side.
+                // Trial divide on the algebraic side.
                 let mut y = Integer::from(a).pow(d) - t * Integer::from(-(b as i32)).pow(d);
                 for (i, (p, _)) in algebraic_base.iter().enumerate() {
                     let e = y.remove_factor_mut(&Integer::from(*p));

@@ -2,6 +2,7 @@ mod lanczos;
 mod linalg;
 mod nfs;
 mod nt;
+mod params;
 
 use std::env;
 use std::io;
