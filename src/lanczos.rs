@@ -196,7 +196,7 @@ fn combine_columns(b: &CscMatrix, mut x: BlockMatrix, vm: BlockMatrix) -> BlockM
         }
 
         let leading_bit_word: usize = leading_bit / N;
-        let leading_bit_mask: u64 = (leading_bit & (N - 1)) as u64;
+        let leading_bit_mask: u64 = 1 << (leading_bit & (N - 1)) as u64;
 
         // Search pivot.
         let mut j = i;
