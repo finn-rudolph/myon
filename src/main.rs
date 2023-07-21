@@ -1,7 +1,7 @@
 mod lanczos;
 mod linalg;
 mod nfs;
-mod prime_test;
+mod nt;
 
 use std::env;
 use std::io;

@@ -12,6 +12,10 @@ const fn mod_exp(mut a: u64, mut b: u64, n: u64) -> u64 {
     c
 }
 
+pub const fn legendre(p: u32, q: u32) -> u32 {
+    mod_exp(p as u64, ((q - 1) >> 1) as u64, q as u64) as u32
+}
+
 // Returns true, if (and only if? I'm not sure.) n is a prime.
 pub fn miller_rabin(n: u32) -> bool {
     if n == 2 {

@@ -1,11 +1,11 @@
-use std::{cmp::max, ops::Neg};
+use std::cmp::max;
 
 use rug::{
     ops::{NegAssign, Pow},
     Complete, Integer,
 };
 
-use crate::{linalg::CscMatrixBuilder, prime_test};
+use crate::{linalg::CscMatrixBuilder, nt};
 
 #[derive(Clone, Copy)]
 struct Params {
@@ -48,7 +48,7 @@ fn rational_factor_base(m: &Integer, params: &Params) -> Vec<(u32, u32)> {
 
     let mut p: u32 = 2;
     while base.len() < params.rational_base_size {
-        if prime_test::miller_rabin(p) {
+        if nt::miller_rabin(p) {
             base.push((p, m.mod_u(p)));
         }
         p += 1;
@@ -82,7 +82,7 @@ fn algebraic_factor_base(t: i32, params: &Params) -> Vec<(u32, u32)> {
     let mut p: u32 = 2;
 
     while base.len() < params.algebraic_base_size {
-        if prime_test::miller_rabin(p) {
+        if nt::miller_rabin(p) {
             let roots = find_polynomial_roots(t, p, params);
             base.extend(roots.iter().map(|r| (p, *r)));
         }
@@ -98,7 +98,7 @@ fn quad_char_base(mut p: u32, t: i32, params: &Params) -> Vec<(u32, u32)> {
 
     // TODO: reqire f'(r) != 0 mod p
     while base.len() < params.quad_char_base_size {
-        if prime_test::miller_rabin(p) {
+        if nt::miller_rabin(p) {
             let roots = find_polynomial_roots(t, p, params);
             base.extend(roots.iter().map(|r| (p, *r)));
         }
@@ -189,7 +189,16 @@ pub fn factorize(r: u32, e: u32, s: i32) -> Integer {
 
                 if x == 1 && y == 1 {
                     // smooth pair (a, b) found!
-                    for (i, (p, r)) in quad_char_base.iter().enumerate() {}
+                    for (i, (p, s)) in quad_char_base.iter().enumerate() {
+                        if nt::legendre(
+                            (((a + b as i32 * *s as i32) % *p as i32 + *p as i32) % *p as i32)
+                                as u32,
+                            *p,
+                        ) == p - 1
+                        {
+                            ones_pos.push((quad_char_begin + i) as u32);
+                        }
+                    }
                     matrix_builder.add_col(ones_pos);
                 }
             }
