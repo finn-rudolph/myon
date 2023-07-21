@@ -2,7 +2,7 @@ use std::cmp::max;
 
 use rug::{ops::Pow, Complete, Integer};
 
-use crate::nt;
+use crate::prime_test;
 
 #[derive(Clone, Copy)]
 struct Params {
@@ -43,7 +43,7 @@ fn rational_factor_base(m: &Integer, params: &Params) -> Vec<(u32, u32)> {
 
     let mut p: u32 = 2;
     while base.len() < params.rational_base_size {
-        if nt::is_prime(p) {
+        if prime_test::miller_rabin(p) {
             base.push((p, m.mod_u(p)));
         }
         p += 1;
@@ -77,7 +77,7 @@ fn algebraic_factor_base(t: i32, params: &Params) -> Vec<(u32, u32)> {
     let mut p: u32 = 2;
 
     while base.len() < params.algebraic_base_size {
-        if nt::is_prime(p) {
+        if prime_test::miller_rabin(p) {
             let roots = find_polynomial_roots(t, p, params);
             base.extend(roots.iter().map(|r| (p, *r)));
         }
