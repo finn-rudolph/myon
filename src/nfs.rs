@@ -10,7 +10,7 @@ struct Params {
     algebraic_base_size: usize,
     polynomial_degree: u32,
     sieve_array_size: usize,
-    fudge: u8, // different fudge for rational and algebraic side?
+    fudge: i8, // different fudge for rational and algebraic side?
 }
 
 impl Params {
@@ -117,13 +117,15 @@ pub fn factorize(r: u32, e: u32, s: i32) -> Integer {
     let mut algebraic_sieve_array: Vec<i8> = vec![0; params.sieve_array_size];
 
     for b in 1.. {
-        rational_sieve_array.fill(-((ilog2_rounded(b) + m.significant_bits()) as i8));
+        rational_sieve_array
+            .fill(-((ilog2_rounded(b) + m.significant_bits()) as i8) + params.fudge);
         line_sieve(b, &mut rational_sieve_array, &rational_base);
 
         let log_tbd = (d * ilog2_rounded(b) + ilog2_rounded(t.abs() as u32)) as i8;
         let a0 = -(params.sieve_array_size as i32 / 2);
         for i in 0..params.sieve_array_size {
-            algebraic_sieve_array[i] = max((d as i32 * (a0 + i as i32)) as i8, log_tbd);
+            algebraic_sieve_array[i] =
+                max((d as i32 * (a0 + i as i32)) as i8, log_tbd) + params.fudge;
         }
         line_sieve(b, &mut algebraic_sieve_array, &algebraic_base);
 
