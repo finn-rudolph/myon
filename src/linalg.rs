@@ -36,18 +36,12 @@ pub struct BlockMatrixTranspose<'a> {
 }
 
 impl CscMatrix {
-    // Builds a CscMatrix, given for each column a Vec containing the numbers of rows with a 1.
-    pub fn new(ones_positions: Vec<Vec<u32>>, num_rows: usize) -> CscMatrix {
-        let mut a = CscMatrix {
+    pub fn new(num_rows: usize, end: Vec<u32>, ones: Vec<u32>) -> CscMatrix {
+        CscMatrix {
             num_rows,
-            end: vec![],
-            ones: vec![],
-        };
-        for mut col in ones_positions {
-            a.ones.append(&mut col);
-            a.end.push(a.ones.len() as u32);
+            end,
+            ones,
         }
-        a
     }
 
     pub fn new_random(num_cols: usize, num_rows: usize, max_ones: usize) -> CscMatrix {
@@ -94,6 +88,36 @@ impl CscMatrix {
     // and is intended to be used only in composition with the '*'-Operator.
     pub fn transpose(&self) -> CscMatrixTranspose {
         CscMatrixTranspose { borrowed: self }
+    }
+}
+
+pub struct CscMatrixBuilder {
+    num_rows: usize,
+    end: Vec<u32>,
+    ones: Vec<u32>,
+}
+
+impl CscMatrixBuilder {
+    pub fn new() -> CscMatrixBuilder {
+        CscMatrixBuilder {
+            num_rows: 0,
+            end: Vec::new(),
+            ones: Vec::new(),
+        }
+    }
+
+    pub fn add_col(&mut self, mut ones_pos: Vec<u32>) {
+        self.ones.append(&mut ones_pos);
+        self.end.push(self.ones.len() as u32)
+    }
+
+    pub fn set_num_rows(&mut self, num_rows: usize) {
+        self.num_rows = num_rows;
+    }
+
+    pub fn build(self) -> CscMatrix {
+        assert_eq!(self.end.len() != 0, self.num_rows != 0);
+        CscMatrix::new(self.num_rows, self.end, self.ones)
     }
 }
 
@@ -173,6 +197,10 @@ impl IndexMut<usize> for BlockMatrix {
 // TODO: Optimize all code from here on (unroll, maybe use count trailing zeros to skip zeros in
 //       matrix-vector-product, try to remove some branches).
 
+// Optimize with SIMD scatter?
+// IDEA: Group several columns together and process all entries of them in sorted order => less
+//       cache misses. (We need to essentially solve some version of manhattan shortest
+//       hamiltonian path)
 impl Mul<&BlockMatrix> for &CscMatrix {
     type Output = BlockMatrix;
 
@@ -256,6 +284,7 @@ impl<'a> Mul<&BlockMatrixTranspose<'a>> for &BlockMatrix {
     }
 }
 
+// IDEA: Gather next 4 or so with bitmask, xor together
 impl<'a> Mul<&BlockMatrix> for &BlockMatrixTranspose<'a> {
     type Output = BlockMatrix;
 
