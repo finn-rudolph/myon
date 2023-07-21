@@ -1,5 +1,12 @@
+mod lanczos;
+mod linalg;
+mod nfs;
+mod nt;
+
 use std::env;
 use std::io;
+
+use rug::{ops::Pow, Integer};
 
 fn read_int<T: std::str::FromStr>() -> T
 where
@@ -24,6 +31,8 @@ fn main() {
     print!("s: ");
     let s = read_int::<i32>();
 
-    let (a, b) = nfs::factorize(r, e, s);
-    println!("Number factored as {} * {}", a, b);
+    let n: Integer = Integer::from(r).pow(e) - s;
+    let a = nfs::factorize(r, e, s);
+
+    println!("Number factored as {} * {}", &a, n / &a);
 }
