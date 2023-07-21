@@ -2,6 +2,7 @@ use rug::{ops::Pow, Integer};
 
 use crate::nt;
 
+#[derive(Clone, Copy)]
 struct Params {
     rational_base_size: usize,
     algebraic_base_size: usize,
@@ -9,8 +10,25 @@ struct Params {
 }
 
 impl Params {
+    const PARAM_TABLE: [(u32, Params); 1] = [(
+        128,
+        Params {
+            rational_base_size: 500,
+            algebraic_base_size: 500,
+            polynomial_degree: 3,
+        },
+    )];
+
     fn new(n: &Integer) -> Params {
-        todo!()
+        let bits = n.significant_bits();
+
+        for (bits_lim, params) in Params::PARAM_TABLE.iter().rev() {
+            if bits <= *bits_lim {
+                return *params;
+            }
+        }
+
+        Params::PARAM_TABLE.last().unwrap().1
     }
 }
 
@@ -64,7 +82,6 @@ fn algebraic_factor_base(t: i32, params: &Params) -> Vec<(u32, u32)> {
 }
 
 pub fn factorize(r: u32, e: u32, s: i32) -> String {
-    const x: u64 = 1 << 43;
     let n: Integer = Integer::from(r).pow(e) - s;
 
     let params = Params::new(&n);
