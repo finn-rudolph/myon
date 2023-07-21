@@ -1,13 +1,17 @@
-use std::cmp::max;
+use std::{cmp::max, ops::Neg};
 
-use rug::{ops::Pow, Complete, Integer};
+use rug::{
+    ops::{NegAssign, Pow},
+    Complete, Integer,
+};
 
-use crate::prime_test;
+use crate::{linalg::CscMatrixBuilder, prime_test};
 
 #[derive(Clone, Copy)]
 struct Params {
     rational_base_size: usize,
     algebraic_base_size: usize,
+    quad_char_base_size: usize,
     polynomial_degree: u32,
     sieve_array_size: usize,
     fudge: i8, // different fudge for rational and algebraic side?
@@ -19,6 +23,7 @@ impl Params {
         Params {
             rational_base_size: 500,
             algebraic_base_size: 500,
+            quad_char_base_size: 100,
             polynomial_degree: 3,
             sieve_array_size: 10000,
             fudge: 20,
@@ -84,6 +89,23 @@ fn algebraic_factor_base(t: i32, params: &Params) -> Vec<(u32, u32)> {
         p += 1;
     }
 
+    base.truncate(params.algebraic_base_size);
+    base
+}
+
+fn quad_char_base(mut p: u32, t: i32, params: &Params) -> Vec<(u32, u32)> {
+    let mut base: Vec<(u32, u32)> = Vec::new();
+
+    // TODO: reqire f'(r) != 0 mod p
+    while base.len() < params.quad_char_base_size {
+        if prime_test::miller_rabin(p) {
+            let roots = find_polynomial_roots(t, p, params);
+            base.extend(roots.iter().map(|r| (p, *r)));
+        }
+        p += 1;
+    }
+
+    base.truncate(params.quad_char_base_size);
     base
 }
 
@@ -112,6 +134,14 @@ pub fn factorize(r: u32, e: u32, s: i32) -> Integer {
     let (t, m) = select_polynomial(r, e, s, &params);
     let rational_base = rational_factor_base(&m, &params);
     let algebraic_base = algebraic_factor_base(t, &params);
+    let quad_char_base = quad_char_base(algebraic_base.last().unwrap().0 + 1, t, &params);
+
+    let rational_begin: usize = 1;
+    let algebraic_begin = rational_begin + rational_base.len();
+    let quad_char_begin = algebraic_begin + algebraic_base.len();
+
+    let mut matrix_builder = CscMatrixBuilder::new();
+    matrix_builder.set_num_rows(quad_char_begin + quad_char_base.len());
 
     let mut rational_sieve_array: Vec<i8> = vec![0; params.sieve_array_size];
     let mut algebraic_sieve_array: Vec<i8> = vec![0; params.sieve_array_size];
@@ -133,21 +163,34 @@ pub fn factorize(r: u32, e: u32, s: i32) -> Integer {
         for i in 0..params.sieve_array_size {
             if rational_sieve_array[i] >= 0 && algebraic_sieve_array[i] >= 0 {
                 let a = a0 + i as i32;
+                let mut ones_pos: Vec<u32> = Vec::new();
 
                 // Trial divide on the rational side.
                 let mut x = a + (b * &m).complete();
-                for (p, _) in &rational_base {
+                if x < 0 {
+                    ones_pos.push(0);
+                    x.neg_assign();
+                }
+                for (i, (p, _)) in rational_base.iter().enumerate() {
                     let e = x.remove_factor_mut(&Integer::from(*p));
+                    if e & 1 == 1 {
+                        ones_pos.push((rational_begin + i) as u32);
+                    }
                 }
 
                 // Trial divide on the algrbraic side.
                 let mut y = Integer::from(a).pow(d) - t * Integer::from(-(b as i32)).pow(d);
-                for (p, _) in &algebraic_base {
+                for (i, (p, _)) in algebraic_base.iter().enumerate() {
                     let e = y.remove_factor_mut(&Integer::from(*p));
+                    if e & 1 == 1 {
+                        ones_pos.push((algebraic_begin + i) as u32);
+                    }
                 }
 
                 if x == 1 && y == 1 {
                     // smooth pair (a, b) found!
+                    for (i, (p, r)) in quad_char_base.iter().enumerate() {}
+                    matrix_builder.add_col(ones_pos);
                 }
             }
         }
