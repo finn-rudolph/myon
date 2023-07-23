@@ -3,6 +3,7 @@ mod linalg;
 mod nfs;
 mod nt;
 mod params;
+mod polynomial;
 mod sqrt;
 
 use std::env;

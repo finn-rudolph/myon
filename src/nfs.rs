@@ -5,7 +5,13 @@ use rug::{
     Complete, Integer,
 };
 
-use crate::{linalg::CscMatrixBuilder, nt, params::Params};
+use crate::{
+    lanczos,
+    linalg::CscMatrixBuilder,
+    nt,
+    params::Params,
+    polynomial::{self, Polynomial},
+};
 
 fn rational_factor_base(m: &Integer, params: &Params) -> Vec<(u32, u32)> {
     let mut base: Vec<(u32, u32)> = Vec::new();
@@ -21,33 +27,13 @@ fn rational_factor_base(m: &Integer, params: &Params) -> Vec<(u32, u32)> {
     base
 }
 
-// Returns two integers t and m, the selected polynomial is x^d - t. f(m) = 0 mod n.
-fn select_polynomial(r: u32, e: u32, s: i32, params: &Params) -> (i32, Integer) {
-    let d = params.polynomial_degree;
-    let k = (e + d - 1) / d;
-    (s * r.pow(k * d - e) as i32, Integer::from(r).pow(k))
-}
-
-fn find_polynomial_roots(t: i32, p: u32, params: &Params) -> Vec<u32> {
-    let d = params.rational_base_size;
-    let mut roots: Vec<u32> = Vec::new();
-
-    for i in 1..p {
-        if (i.pow(d as u32) as i32 - t) % p as i32 == 0 {
-            roots.push(i);
-        }
-    }
-
-    roots
-}
-
-fn algebraic_factor_base(t: i32, params: &Params) -> Vec<(u32, u32)> {
+fn algebraic_factor_base(f: &Polynomial, params: &Params) -> Vec<(u32, u32)> {
     let mut base: Vec<(u32, u32)> = Vec::new();
     let mut p: u32 = 2;
 
     while base.len() < params.algebraic_base_size {
         if nt::miller_rabin(p) {
-            let roots = find_polynomial_roots(t, p, params);
+            let roots = f.find_roots_mod_p(p);
             base.extend(roots.iter().map(|r| (p, *r)));
         }
         p += 1;
@@ -57,14 +43,18 @@ fn algebraic_factor_base(t: i32, params: &Params) -> Vec<(u32, u32)> {
     base
 }
 
-fn quad_char_base(mut p: u32, t: i32, params: &Params) -> Vec<(u32, u32)> {
+fn quad_char_base(mut p: u32, f: &Polynomial, params: &Params) -> Vec<(u32, u32)> {
     let mut base: Vec<(u32, u32)> = Vec::new();
+    let f_derivative = f.derivative();
 
-    // TODO: reqire f'(r) != 0 mod p
     while base.len() < params.quad_char_base_size {
         if nt::miller_rabin(p) {
-            let roots = find_polynomial_roots(t, p, params);
-            base.extend(roots.iter().map(|r| (p, *r)));
+            let roots = f.find_roots_mod_p(p);
+            for r in roots {
+                if f_derivative.evaluate(r) % p != 0 {
+                    base.push((p, r));
+                }
+            }
         }
         p += 1;
     }
@@ -95,10 +85,11 @@ pub fn factorize(r: u32, e: u32, s: i32) -> Integer {
 
     let params = Params::new(&n);
     let d = params.polynomial_degree;
-    let (t, m) = select_polynomial(r, e, s, &params);
+    let (f, m) = polynomial::select_special(r, e, s, &params);
+    // Maybe check that the polynomial is irreducible
     let rational_base = rational_factor_base(&m, &params);
-    let algebraic_base = algebraic_factor_base(t, &params);
-    let quad_char_base = quad_char_base(algebraic_base.last().unwrap().0 + 1, t, &params);
+    let algebraic_base = algebraic_factor_base(&f, &params);
+    let quad_char_base = quad_char_base(algebraic_base.last().unwrap().0 + 1, &f, &params);
 
     let rational_begin: usize = 1;
     let algebraic_begin = rational_begin + rational_base.len();
@@ -106,6 +97,7 @@ pub fn factorize(r: u32, e: u32, s: i32) -> Integer {
 
     let mut matrix_builder = CscMatrixBuilder::new();
     matrix_builder.set_num_rows(quad_char_begin + quad_char_base.len());
+    let mut relations: Vec<(u32, u32)> = Vec::new();
 
     let mut rational_sieve_array: Vec<i8> = vec![0; params.sieve_array_size];
     let mut algebraic_sieve_array: Vec<i8> = vec![0; params.sieve_array_size];
@@ -115,7 +107,8 @@ pub fn factorize(r: u32, e: u32, s: i32) -> Integer {
             .fill(-((ilog2_rounded(b) + m.significant_bits()) as i8) + params.fudge);
         line_sieve(b, &mut rational_sieve_array, &rational_base);
 
-        let log_tbd = (d * ilog2_rounded(b) + ilog2_rounded(t.abs() as u32)) as i8;
+        // TODO: Fix this
+        let log_tbd = (d * ilog2_rounded(b) + ilog2_rounded(f[d as usize].to_u32().unwrap())) as i8;
         let a0 = -(params.sieve_array_size as i32 / 2);
         for i in 0..params.sieve_array_size {
             algebraic_sieve_array[i] =
@@ -142,8 +135,8 @@ pub fn factorize(r: u32, e: u32, s: i32) -> Integer {
                     }
                 }
 
-                // Trial divide on the algebraic side.
-                let mut y = Integer::from(a).pow(d) - t * Integer::from(-(b as i32)).pow(d);
+                // Trial divide on the algebraic side. TODO: FIX NORM COMPUTATION
+                let mut y = Integer::new();
                 for (i, (p, _)) in algebraic_base.iter().enumerate() {
                     let e = y.remove_factor_mut(&Integer::from(*p));
                     if e & 1 == 1 {
@@ -164,10 +157,13 @@ pub fn factorize(r: u32, e: u32, s: i32) -> Integer {
                         }
                     }
                     matrix_builder.add_col(ones_pos);
+                    relations.push((a as u32, b));
                 }
             }
         }
     }
+
+    let dependencies = lanczos::find_dependencies(&matrix_builder.build());
 
     todo!()
 }
