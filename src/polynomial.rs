@@ -6,7 +6,7 @@ use std::{
 
 use rug::{ops::Pow, Complete, Integer};
 
-use crate::params::Params;
+use crate::{nt, params::Params};
 
 pub const MAX_DEGREE: usize = Params::PARAM_TABLE[Params::PARAM_TABLE.len() - 1]
     .1
@@ -69,7 +69,7 @@ impl Polynomial {
 
     // Multiplies f and g mod self. "mod" means here, whenever we encounter a power of x greater or
     // equal to the degree of self, we subtract some multiple of self to make this power disappear.
-    pub fn multiply_mod(&self, f: &Polynomial, g: &Polynomial) -> Polynomial {
+    pub fn mul_mod(&self, f: &Polynomial, g: &Polynomial) -> Polynomial {
         let d = self.degree();
 
         // Initialize result with the leading coefficient of self times rhs. This means, the powers
@@ -98,6 +98,53 @@ impl Polynomial {
         }
 
         result
+    }
+
+    fn pow_mod(&self, mut f: Polynomial, mut e: Integer) -> Polynomial {
+        let mut g = Polynomial::new();
+        g[0] = Integer::from(1);
+
+        while e != 0 {
+            if e.is_odd() {
+                g = self.mul_mod(&g, &f);
+            }
+            f = self.mul_mod(&f, &f);
+            e >>= 1;
+        }
+
+        g
+    }
+
+    fn rem(&self, modulus: &Polynomial) -> Polynomial {
+        todo!()
+    }
+
+    fn gcd(self, f: Polynomial) -> Polynomial {
+        if f.degree() == 0 && f[0] == 0 {
+            return self;
+        }
+        let r = self.rem(&f);
+        f.gcd(r)
+    }
+
+    pub fn is_irreducible_mod_p(&self, p: u32) -> bool {
+        let d = self.degree();
+
+        let mut prime_divisors: Vec<u32> = Vec::new();
+        for q in 2..=d {
+            if d % q == 0 && nt::miller_rabin(q as u32) {
+                prime_divisors.push(q as u32);
+            }
+        }
+
+        let mut x_polynomial = Polynomial::new();
+        x_polynomial[1] = Integer::from(1);
+
+        for q in prime_divisors {
+            let h = self.pow_mod(x_polynomial.clone(), Integer::from(p).pow(d as u32 / q));
+        }
+
+        todo!()
     }
 }
 
