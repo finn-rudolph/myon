@@ -3,6 +3,7 @@ mod linalg;
 mod nfs;
 mod nt;
 mod params;
+mod sqrt;
 
 use std::env;
 use std::io;
