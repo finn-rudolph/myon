@@ -108,8 +108,10 @@ impl GfPolynomial {
         g
     }
 
+    // Rabin's test of irreducibility for polynomials over finite fields.
     pub fn is_irreducible(&self) -> bool {
         let d = self.degree();
+        let p = self.modulus;
 
         let mut prime_divisors: Vec<u32> = Vec::new();
         for q in 2..=d {
@@ -118,17 +120,22 @@ impl GfPolynomial {
             }
         }
 
-        let mut x_polynomial = GfPolynomial::new(self.modulus);
-        x_polynomial[1] = 1;
+        let mut x = GfPolynomial::new(p);
+        x[1] = 1;
 
         for q in prime_divisors {
-            let h = self.pow_mod(
-                x_polynomial.clone(),
-                Integer::from(self.modulus).pow(d as u32 / q),
-            );
+            let mut h = self.pow_mod(x.clone(), Integer::from(p).pow(d as u32 / q));
+            h[1] = (h[1] + p - 1) % p; // subtract x
+            let g = h.gcd(self.clone());
+            if g.degree() != 0 {
+                return false;
+            }
         }
 
-        todo!()
+        let mut h = self.pow_mod(x.clone(), Integer::from(p).pow(d as u32));
+        h[1] = (h[1] + p - 1) % p;
+
+        h.degree() == 0 && h[0] == 0
     }
 }
 
