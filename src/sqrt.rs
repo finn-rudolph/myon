@@ -1,6 +1,6 @@
 use rug::Integer;
 
-use crate::{nt, polynomial::Polynomial};
+use crate::{gfpolynomial::GfPolynomial, nt, polynomial::Polynomial};
 
 // The algebraic square root by the q-adic newton method. Uses divide and conquer to evaluate the
 // product in O(M log n) time, where M is the time needed to multiply two numbers in the order of
@@ -26,7 +26,7 @@ fn select_p(f: &Polynomial) -> u32 {
     loop {
         // p must be inert in the number field, which means f must be irreducible mod p. Check
         // this by Rabin's test of irreducibility.
-        if nt::miller_rabin(p) && f.is_irreducible_mod_p(p) {
+        if nt::miller_rabin(p) && GfPolynomial::from_polynomial(f, p).is_irreducible() {
             return p;
         }
         p += 2;
