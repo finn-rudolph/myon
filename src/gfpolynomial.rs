@@ -40,21 +40,16 @@ impl GfPolynomial {
         d
     }
 
-    // Multiplies f and g mod self. "mod" means here, whenever we encounter a power of x greater or
-    // equal to the degree of self, we subtract some multiple of self to make this power disappear.
+    // Same routine as in the general polynomial case.
     pub fn mul_mod(&self, f: &GfPolynomial, g: &GfPolynomial) -> GfPolynomial {
         let d = self.degree();
+        let p = self.modulus;
 
-        // Initialize result with the leading coefficient of self times rhs. This means, the powers
-        // of alpha present in the result are actually shifted up by d - 1.
         let mut result = GfPolynomial::new(self.modulus);
         for i in 0..d {
-            result[i] = (&g[i] * &f[d - 1]).into();
+            result[i] = ((g[i] as u64 * f[d - 1] as u64) % p as u64) as u32;
         }
 
-        // In each iteration, the leading coffiecient is converted to lower order terms, and the
-        // i-th coefficient of self times rhs is added. Thus, the shift in the exponents of powers
-        // of alpha is reduced by 1.
         for i in (0..d - 1).rev() {
             let mut leading_coefficient = 0u32;
             for coefficient in &mut result.coefficients {
@@ -62,19 +57,32 @@ impl GfPolynomial {
             }
 
             for (j, coefficient) in result.coefficients.iter_mut().enumerate() {
-                *coefficient -= &leading_coefficient * &self[j];
+                *coefficient +=
+                    p - ((leading_coefficient as u64 * self[j] as u64) % p as u64) as u32;
             }
 
             for j in 0..d {
-                result[j] += &g[j] * &f[i];
+                result[j] = ((result[j] as u64 + g[j] as u64 * f[i] as u64) % p as u64) as u32;
             }
         }
 
         result
     }
 
-    fn rem(&self, modulus: &GfPolynomial) -> GfPolynomial {
-        todo!()
+    fn rem(mut self, modulus: &GfPolynomial) -> GfPolynomial {
+        let (d, e) = (self.degree(), modulus.degree());
+        let p = self.modulus;
+
+        for i in (e..=d).rev() {
+            let quotient = self[i] * nt::mod_inv(self[i], p);
+            for j in 0..=e {
+                self[j + i - e] = (self[j + i - e] + p
+                    - ((quotient as u64 * modulus[j] as u64) % p as u64) as u32)
+                    % p;
+            }
+        }
+
+        self
     }
 
     fn gcd(self, f: GfPolynomial) -> GfPolynomial {

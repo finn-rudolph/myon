@@ -1,3 +1,4 @@
+use core::mem::swap;
 use std::{
     cmp::PartialOrd,
     ops::{Index, IndexMut, MulAssign, Rem, Sub},
@@ -64,6 +65,39 @@ impl Polynomial {
         }
 
         roots
+    }
+
+    // Multiplies f and g mod self. "mod" means here, whenever we encounter a power of x greater or
+    // equal to the degree of self, we subtract some multiple of self to make this power disappear.
+    pub fn mul_mod(&self, f: &Polynomial, g: &Polynomial) -> Polynomial {
+        let d = self.degree();
+
+        // Initialize result with the leading coefficient of self times rhs. This means, the powers
+        // of alpha present in the result are actually shifted up by d - 1.
+        let mut result = Polynomial::new();
+        for i in 0..d {
+            result[i] = (&g[i] * &f[d - 1]).into();
+        }
+
+        // In each iteration, the leading coffiecient is converted to lower order terms, and the
+        // i-th coefficient of self times rhs is added. Thus, the shift in the exponents of powers
+        // of alpha is reduced by 1.
+        for i in (0..d - 1).rev() {
+            let mut leading_coefficient = Integer::new();
+            for coefficient in &mut result.0 {
+                swap(&mut leading_coefficient, coefficient);
+            }
+
+            for (j, coefficient) in result.0.iter_mut().enumerate() {
+                *coefficient -= &leading_coefficient * &self[j];
+            }
+
+            for j in 0..d {
+                result[j] += &g[j] * &f[i];
+            }
+        }
+
+        result
     }
 }
 

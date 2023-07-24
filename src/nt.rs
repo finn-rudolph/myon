@@ -12,6 +12,10 @@ const fn mod_exp(mut a: u64, mut b: u64, n: u64) -> u64 {
     c
 }
 
+pub const fn mod_inv(a: u32, p: u32) -> u32 {
+    mod_exp(a as u64, p as u64 - 2, p as u64) as u32
+}
+
 pub const fn legendre(p: u32, q: u32) -> u32 {
     mod_exp(p as u64, ((q - 1) >> 1) as u64, q as u64) as u32
 }
