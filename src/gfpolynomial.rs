@@ -12,7 +12,7 @@ pub struct GfPolynomial {
 }
 
 impl GfPolynomial {
-    fn new(modulus: u32) -> GfPolynomial {
+    pub fn new(modulus: u32) -> GfPolynomial {
         GfPolynomial {
             coefficients: [0; MAX_DEGREE + 1],
             modulus,
@@ -33,6 +33,13 @@ impl GfPolynomial {
             d -= 1;
         }
         d
+    }
+
+    pub fn add(mut self, rhs: &GfPolynomial) -> GfPolynomial {
+        for (i, coefficient) in self.coefficients.iter_mut().enumerate() {
+            *coefficient = (*coefficient + rhs[i]) % self.modulus;
+        }
+        self
     }
 
     // Same routine as in the general polynomial case.
