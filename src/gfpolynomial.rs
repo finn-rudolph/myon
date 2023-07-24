@@ -3,12 +3,7 @@ use std::ops::{Index, IndexMut};
 
 use rug::{ops::Pow, Integer};
 
-use crate::{
-    nt,
-    polynomial::{self, Polynomial},
-};
-
-const MAX_DEGREE: usize = polynomial::MAX_DEGREE;
+use crate::{nt, params::MAX_DEGREE, polynomial::Polynomial};
 
 #[derive(Clone)]
 pub struct GfPolynomial {
@@ -72,9 +67,10 @@ impl GfPolynomial {
     fn rem(mut self, modulus: &GfPolynomial) -> GfPolynomial {
         let (d, e) = (self.degree(), modulus.degree());
         let p = self.modulus;
+        let modulus_leading_inv = nt::mod_inv(modulus[e], p);
 
         for i in (e..=d).rev() {
-            let quotient = self[i] * nt::mod_inv(self[i], p);
+            let quotient = ((self[i] as u64 * modulus_leading_inv as u64) % p as u64) as u32;
             for j in 0..=e {
                 self[j + i - e] = (self[j + i - e] + p
                     - ((quotient as u64 * modulus[j] as u64) % p as u64) as u32)

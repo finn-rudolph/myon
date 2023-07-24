@@ -1,5 +1,9 @@
 use rug::Integer;
 
+pub const MAX_DEGREE: usize = Params::PARAM_TABLE[Params::PARAM_TABLE.len() - 1]
+    .1
+    .polynomial_degree as usize;
+
 #[derive(Clone, Copy)]
 pub struct Params {
     pub rational_base_size: usize,

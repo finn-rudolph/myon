@@ -6,11 +6,7 @@ use std::{
 
 use rug::{ops::Pow, Complete, Integer};
 
-use crate::params::Params;
-
-pub const MAX_DEGREE: usize = Params::PARAM_TABLE[Params::PARAM_TABLE.len() - 1]
-    .1
-    .polynomial_degree as usize;
+use crate::params::{Params, MAX_DEGREE};
 
 #[derive(Clone)]
 pub struct Polynomial([Integer; MAX_DEGREE + 1]);
