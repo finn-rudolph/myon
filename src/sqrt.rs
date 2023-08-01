@@ -1,5 +1,5 @@
 use rand::{thread_rng, Rng};
-use rug::{ops::Pow, Integer};
+use rug::{ops::Pow, Complete, Integer};
 
 use crate::{
     gfpolynomial::{GfMpPolynomial, GfPolynomial},
@@ -13,20 +13,34 @@ use crate::{
 pub fn algebraic_sqrt(integers: &Vec<MpPolynomial>, f: &MpPolynomial) -> MpPolynomial {
     let s = mul_algebraic_integers(integers, f);
     let p = select_p(f);
-    let r = GfMpPolynomial::from(&inv_sqrt_mod_p(
-        &GfPolynomial::from_polynomial(&s, p),
-        &GfPolynomial::from_polynomial(&f, p),
+    let mut r = GfMpPolynomial::from(&inv_sqrt_mod_p(
+        &GfPolynomial::from_mp_polynomial(&s, p),
+        &GfPolynomial::from_mp_polynomial(&f, p),
     ));
 
-    let max_coeffiecient = s.coefficients().iter().max().unwrap();
+    let max_coeffiecient = s.coefficients_ref().iter().max().unwrap();
     let mut q = Integer::from(p);
 
     while &q < max_coeffiecient {
         q.square_mut();
-        let t = GfMpPolynomial::from_polynomial(&s, q.clone());
+        let f_mod_q = GfMpPolynomial::from_mp_polynomial(f, q.clone());
+        let mut t = f_mod_q.mul_mod(
+            &GfMpPolynomial::from_mp_polynomial(&s, q.clone()),
+            &f_mod_q.mul_mod(&r, &r),
+        );
+        t[0] = ((3u32 - &t[0]).complete() + &q) % &q;
+        t = f_mod_q.mul_mod(&r, &t);
+
+        let two_inv = Integer::from(2).invert(&q).unwrap();
+
+        for coefficient in t.coefficients_mut() {
+            *coefficient = (coefficient.clone() * &two_inv) % &q;
+        }
+
+        r = t;
     }
 
-    todo!()
+    MpPolynomial::from(r)
 }
 
 fn mul_algebraic_integers(integers: &[MpPolynomial], f: &MpPolynomial) -> MpPolynomial {
@@ -43,7 +57,7 @@ fn select_p(f: &MpPolynomial) -> u32 {
     let mut p: u32 = 100000007;
     loop {
         // p must be inert in the number field, which means f must be irreducible mod p.
-        if nt::miller_rabin(p) && GfPolynomial::from_polynomial(f, p).is_irreducible() {
+        if nt::miller_rabin(p) && GfPolynomial::from_mp_polynomial(f, p).is_irreducible() {
             return p;
         }
         p += 2;

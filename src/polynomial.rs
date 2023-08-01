@@ -6,7 +6,10 @@ use std::{
 
 use rug::{ops::Pow, Complete, Integer};
 
-use crate::params::{Params, MAX_DEGREE};
+use crate::{
+    gfpolynomial::GfMpPolynomial,
+    params::{Params, MAX_DEGREE},
+};
 
 pub trait Polynomial<T>
 where
@@ -14,7 +17,11 @@ where
 {
     fn degree(&self) -> usize;
 
-    fn coefficients(&self) -> &[T];
+    fn coefficients(self) -> [T; MAX_DEGREE + 1];
+
+    fn coefficients_ref(&self) -> &[T; MAX_DEGREE + 1];
+
+    fn coefficients_mut(&mut self) -> &mut [T; MAX_DEGREE + 1];
 }
 
 #[derive(Clone)]
@@ -107,8 +114,16 @@ impl Polynomial<Integer> for MpPolynomial {
         d
     }
 
-    fn coefficients(&self) -> &[Integer] {
+    fn coefficients(self) -> [Integer; MAX_DEGREE + 1] {
+        self.0
+    }
+
+    fn coefficients_ref(&self) -> &[Integer; MAX_DEGREE + 1] {
         &self.0
+    }
+
+    fn coefficients_mut(&mut self) -> &mut [Integer; MAX_DEGREE + 1] {
+        &mut self.0
     }
 }
 
@@ -123,6 +138,12 @@ impl Index<usize> for MpPolynomial {
 impl IndexMut<usize> for MpPolynomial {
     fn index_mut(&mut self, i: usize) -> &mut Integer {
         &mut self.0[i]
+    }
+}
+
+impl From<GfMpPolynomial> for MpPolynomial {
+    fn from(f: GfMpPolynomial) -> MpPolynomial {
+        MpPolynomial(f.coefficients())
     }
 }
 
