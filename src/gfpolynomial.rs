@@ -1,7 +1,7 @@
 use core::mem::swap;
 use std::ops::{Index, IndexMut};
 
-use rug::{ops::Pow, Integer};
+use rug::{ops::Pow, Complete, Integer};
 
 use crate::{
     nt,
@@ -23,7 +23,7 @@ impl GfPolynomial {
         }
     }
 
-    pub fn from_polynomial(f: &MpPolynomial, modulus: u32) -> GfPolynomial {
+    pub fn from_mp_polynomial(f: &MpPolynomial, modulus: u32) -> GfPolynomial {
         let mut g = GfPolynomial::new(modulus);
         for i in 0..=MAX_DEGREE {
             g[i] = f[i].mod_u(modulus);
@@ -114,7 +114,7 @@ impl GfPolynomial {
     // Rabin's test of irreducibility for polynomials over finite fields.
     pub fn is_irreducible(&self) -> bool {
         let d = self.degree();
-        let p = self.modulus;
+        let p = self.modulus();
 
         let mut prime_divisors: Vec<u32> = Vec::new();
         for q in 2..=d {
@@ -183,12 +183,45 @@ impl GfMpPolynomial {
         }
     }
 
-    pub fn from_polynomial(f: &MpPolynomial, modulus: Integer) -> GfMpPolynomial {
+    pub fn from_mp_polynomial(f: &MpPolynomial, modulus: Integer) -> GfMpPolynomial {
         let mut g = GfMpPolynomial::new(modulus);
         for (i, coefficient) in f.coefficients().iter().enumerate() {
             g.coefficients[i] = Integer::from(coefficient) % &g.modulus;
         }
         g
+    }
+
+    pub fn modulus(&self) -> &Integer {
+        &self.modulus
+    }
+
+    // Same routine as in the general polynomial case.
+    pub fn mul_mod(&self, f: &GfMpPolynomial, g: &GfMpPolynomial) -> GfMpPolynomial {
+        let d = self.degree();
+        let p = self.modulus();
+
+        let mut result = GfMpPolynomial::new(self.modulus().clone());
+        for i in 0..d {
+            result[i] = (&g[i] * &f[d - 1]).complete() % p;
+        }
+
+        for i in (0..d - 1).rev() {
+            let mut leading_coefficient = Integer::new();
+            for coefficient in &mut result.coefficients {
+                swap(&mut leading_coefficient, coefficient);
+            }
+
+            for (j, coefficient) in result.coefficients.iter_mut().enumerate() {
+                *coefficient += p - (&leading_coefficient * &self[j]).complete() % p;
+            }
+
+            for j in 0..d {
+                result[j] += &g[j] * &f[i];
+                result[j] %= p;
+            }
+        }
+
+        result
     }
 }
 
