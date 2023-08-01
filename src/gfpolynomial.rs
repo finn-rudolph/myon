@@ -27,6 +27,10 @@ impl GfPolynomial {
         g
     }
 
+    pub fn modulus(&self) -> u32 {
+        self.modulus
+    }
+
     pub fn degree(&self) -> usize {
         let mut d = MAX_DEGREE;
         while self[d] == 0 {
@@ -162,11 +166,19 @@ pub struct GfMpPolynomial {
 }
 
 impl GfMpPolynomial {
-    fn new(modulus: Integer) -> GfMpPolynomial {
+    pub fn new(modulus: Integer) -> GfMpPolynomial {
         GfMpPolynomial {
             coefficients: [Integer::ZERO; MAX_DEGREE + 1],
             modulus,
         }
+    }
+
+    pub fn from_polynomial(f: &Polynomial, modulus: Integer) -> GfMpPolynomial {
+        let mut g = GfMpPolynomial::new(modulus);
+        for (i, coefficient) in f.coefficients().iter().enumerate() {
+            g.coefficients[i] = Integer::from(coefficient) % &g.modulus;
+        }
+        g
     }
 
     pub fn degree(&self) -> usize {
@@ -189,5 +201,15 @@ impl Index<usize> for GfMpPolynomial {
 impl IndexMut<usize> for GfMpPolynomial {
     fn index_mut(&mut self, i: usize) -> &mut Integer {
         &mut self.coefficients[i]
+    }
+}
+
+impl From<&GfPolynomial> for GfMpPolynomial {
+    fn from(f: &GfPolynomial) -> GfMpPolynomial {
+        let mut g = GfMpPolynomial::new(Integer::from(f.modulus()));
+        for (i, coefficient) in f.coefficients.iter().enumerate() {
+            g.coefficients[i] = Integer::from(*coefficient);
+        }
+        g
     }
 }

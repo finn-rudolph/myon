@@ -1,13 +1,30 @@
 use rand::{thread_rng, Rng};
 use rug::{ops::Pow, Integer};
 
-use crate::{gfpolynomial::GfPolynomial, nt, polynomial::Polynomial};
+use crate::{
+    gfpolynomial::{GfMpPolynomial, GfPolynomial},
+    nt,
+    polynomial::Polynomial,
+};
 
-// The algebraic square root by the q-adic newton method. Uses divide and conquer to evaluate the
-// product in O(M log n) time, where M is the time needed to multiply two numbers in the order of
-// magnitude of the result.
-pub fn algebraic_sqrt(integers: Vec<Polynomial>, f: &Polynomial) -> Polynomial {
-    let product = mul_algebraic_integers(&integers, f);
+// Calculates the algebraic square root of the product of 'integers' using q-adic newton iteration.
+// Uses divide and conquer to evaluate the product in O(M log n) time, where M is the time needed
+// to multiply two numbers in the order of magnitude of the result.
+pub fn algebraic_sqrt(integers: &Vec<Polynomial>, f: &Polynomial) -> Polynomial {
+    let s = mul_algebraic_integers(integers, f);
+    let p = select_p(f);
+    let r = GfMpPolynomial::from(&inv_sqrt_mod_p(
+        &GfPolynomial::from_polynomial(&s, p),
+        &GfPolynomial::from_polynomial(&f, p),
+    ));
+
+    let max_coeffiecient = s.coefficients().iter().max().unwrap();
+    let mut q = Integer::from(p);
+
+    while &q < max_coeffiecient {
+        q.square_mut();
+        let t = GfMpPolynomial::from_polynomial(&s, q.clone());
+    }
 
     todo!()
 }
@@ -50,7 +67,8 @@ fn mul_y_polynomials(
 
 // Compute a square root of s mod p (and, as always, mod f). The algorithm is from Jensen, P. L.
 // (2005).
-fn inv_sqrt_mod_p(s: &GfPolynomial, f: &GfPolynomial, p: u32) -> GfPolynomial {
+fn inv_sqrt_mod_p(s: &GfPolynomial, f: &GfPolynomial) -> GfPolynomial {
+    let p = s.modulus();
     let d = f.degree();
     let mut rng = thread_rng();
 

@@ -1,3 +1,4 @@
+mod gfpolynomial;
 mod lanczos;
 mod linalg;
 mod nfs;

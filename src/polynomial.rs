@@ -24,6 +24,10 @@ impl Polynomial {
         d
     }
 
+    pub fn coefficients(&self) -> &[Integer] {
+        &self.0
+    }
+
     pub fn evaluate<T: Copy>(&self, x: T) -> Integer
     where
         Integer: MulAssign<T>,
