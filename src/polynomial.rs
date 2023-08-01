@@ -8,24 +8,21 @@ use rug::{ops::Pow, Complete, Integer};
 
 use crate::params::{Params, MAX_DEGREE};
 
+pub trait Polynomial<T>
+where
+    Self: Index<usize> + IndexMut<usize>,
+{
+    fn degree(&self) -> usize;
+
+    fn coefficients(&self) -> &[T];
+}
+
 #[derive(Clone)]
-pub struct Polynomial([Integer; MAX_DEGREE + 1]);
+pub struct MpPolynomial([Integer; MAX_DEGREE + 1]);
 
-impl Polynomial {
-    fn new() -> Polynomial {
-        Polynomial([Integer::ZERO; MAX_DEGREE + 1])
-    }
-
-    pub fn degree(&self) -> usize {
-        let mut d = MAX_DEGREE;
-        while self[d] == 0 {
-            d -= 1;
-        }
-        d
-    }
-
-    pub fn coefficients(&self) -> &[Integer] {
-        &self.0
+impl MpPolynomial {
+    fn new() -> MpPolynomial {
+        MpPolynomial([Integer::ZERO; MAX_DEGREE + 1])
     }
 
     pub fn evaluate<T: Copy>(&self, x: T) -> Integer
@@ -41,8 +38,8 @@ impl Polynomial {
         y
     }
 
-    pub fn derivative(&self) -> Polynomial {
-        let mut f = Polynomial::new();
+    pub fn derivative(&self) -> MpPolynomial {
+        let mut f = MpPolynomial::new();
         for (i, coefficient) in self.0.iter().skip(1).enumerate() {
             f[i - 1] = (coefficient * i).complete();
         }
@@ -69,12 +66,12 @@ impl Polynomial {
 
     // Multiplies f and g mod self. "mod" means here, whenever we encounter a power of x greater or
     // equal to the degree of self, we subtract some multiple of self to make this power disappear.
-    pub fn mul_mod(&self, f: &Polynomial, g: &Polynomial) -> Polynomial {
+    pub fn mul_mod(&self, f: &MpPolynomial, g: &MpPolynomial) -> MpPolynomial {
         let d = self.degree();
 
         // Initialize result with the leading coefficient of self times rhs. This means, the powers
         // of alpha present in the result are actually shifted up by d - 1.
-        let mut result = Polynomial::new();
+        let mut result = MpPolynomial::new();
         for i in 0..d {
             result[i] = (&g[i] * &f[d - 1]).into();
         }
@@ -101,7 +98,21 @@ impl Polynomial {
     }
 }
 
-impl Index<usize> for Polynomial {
+impl Polynomial<Integer> for MpPolynomial {
+    fn degree(&self) -> usize {
+        let mut d = MAX_DEGREE;
+        while self[d] == 0 {
+            d -= 1;
+        }
+        d
+    }
+
+    fn coefficients(&self) -> &[Integer] {
+        &self.0
+    }
+}
+
+impl Index<usize> for MpPolynomial {
     type Output = Integer;
 
     fn index(&self, i: usize) -> &Integer {
@@ -109,7 +120,7 @@ impl Index<usize> for Polynomial {
     }
 }
 
-impl IndexMut<usize> for Polynomial {
+impl IndexMut<usize> for MpPolynomial {
     fn index_mut(&mut self, i: usize) -> &mut Integer {
         &mut self.0[i]
     }
@@ -117,14 +128,14 @@ impl IndexMut<usize> for Polynomial {
 
 // Polynomial selection for numbers of the form r^e - s, with small r and |s|. Returns the selected
 // polynomial and an integer m, such that f(m) = 0 mod n.
-pub fn select_special(r: u32, e: u32, s: i32, params: &Params) -> (Polynomial, Integer) {
+pub fn select_special(r: u32, e: u32, s: i32, params: &Params) -> (MpPolynomial, Integer) {
     let d = params.polynomial_degree;
-    let k = (e + d - 1) / d;
+    let k = (e + d as u32 - 1) / d as u32;
 
-    let mut f = Polynomial::new();
+    let mut f = MpPolynomial::new();
     f[d as usize] = Integer::from(1);
-    f[0] = Integer::from(s * r.pow(k * d - e) as i32);
-    assert_eq!(f.degree(), params.polynomial_degree as usize);
+    f[0] = Integer::from(s * r.pow(k * d as u32 - e) as i32);
+    assert_eq!(f.degree(), params.polynomial_degree);
 
     (f, Integer::from(r).pow(k))
 }

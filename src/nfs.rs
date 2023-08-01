@@ -10,7 +10,7 @@ use crate::{
     linalg::CscMatrixBuilder,
     nt,
     params::Params,
-    polynomial::{self, Polynomial},
+    polynomial::{self, MpPolynomial},
 };
 
 fn rational_factor_base(m: &Integer, params: &Params) -> Vec<(u32, u32)> {
@@ -27,7 +27,7 @@ fn rational_factor_base(m: &Integer, params: &Params) -> Vec<(u32, u32)> {
     base
 }
 
-fn algebraic_factor_base(f: &Polynomial, params: &Params) -> Vec<(u32, u32)> {
+fn algebraic_factor_base(f: &MpPolynomial, params: &Params) -> Vec<(u32, u32)> {
     let mut base: Vec<(u32, u32)> = Vec::new();
     let mut p: u32 = 2;
 
@@ -43,7 +43,7 @@ fn algebraic_factor_base(f: &Polynomial, params: &Params) -> Vec<(u32, u32)> {
     base
 }
 
-fn quad_char_base(mut p: u32, f: &Polynomial, params: &Params) -> Vec<(u32, u32)> {
+fn quad_char_base(mut p: u32, f: &MpPolynomial, params: &Params) -> Vec<(u32, u32)> {
     let mut base: Vec<(u32, u32)> = Vec::new();
     let f_derivative = f.derivative();
 
@@ -108,7 +108,8 @@ pub fn factorize(r: u32, e: u32, s: i32) -> Integer {
         line_sieve(b, &mut rational_sieve_array, &rational_base);
 
         // TODO: Fix this
-        let log_tbd = (d * ilog2_rounded(b) + ilog2_rounded(f[d as usize].to_u32().unwrap())) as i8;
+        let log_tbd =
+            (d as u32 * ilog2_rounded(b) + ilog2_rounded(f[d as usize].to_u32().unwrap())) as i8;
         let a0 = -(params.sieve_array_size as i32 / 2);
         for i in 0..params.sieve_array_size {
             algebraic_sieve_array[i] =

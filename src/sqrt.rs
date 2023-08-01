@@ -4,13 +4,13 @@ use rug::{ops::Pow, Integer};
 use crate::{
     gfpolynomial::{GfMpPolynomial, GfPolynomial},
     nt,
-    polynomial::Polynomial,
+    polynomial::{MpPolynomial, Polynomial},
 };
 
 // Calculates the algebraic square root of the product of 'integers' using q-adic newton iteration.
 // Uses divide and conquer to evaluate the product in O(M log n) time, where M is the time needed
 // to multiply two numbers in the order of magnitude of the result.
-pub fn algebraic_sqrt(integers: &Vec<Polynomial>, f: &Polynomial) -> Polynomial {
+pub fn algebraic_sqrt(integers: &Vec<MpPolynomial>, f: &MpPolynomial) -> MpPolynomial {
     let s = mul_algebraic_integers(integers, f);
     let p = select_p(f);
     let r = GfMpPolynomial::from(&inv_sqrt_mod_p(
@@ -29,7 +29,7 @@ pub fn algebraic_sqrt(integers: &Vec<Polynomial>, f: &Polynomial) -> Polynomial 
     todo!()
 }
 
-fn mul_algebraic_integers(integers: &[Polynomial], f: &Polynomial) -> Polynomial {
+fn mul_algebraic_integers(integers: &[MpPolynomial], f: &MpPolynomial) -> MpPolynomial {
     if integers.len() == 1 {
         return integers.first().unwrap().clone();
     }
@@ -39,7 +39,7 @@ fn mul_algebraic_integers(integers: &[Polynomial], f: &Polynomial) -> Polynomial
     )
 }
 
-fn select_p(f: &Polynomial) -> u32 {
+fn select_p(f: &MpPolynomial) -> u32 {
     let mut p: u32 = 100000007;
     loop {
         // p must be inert in the number field, which means f must be irreducible mod p.

@@ -2,14 +2,14 @@ use rug::Integer;
 
 pub const MAX_DEGREE: usize = Params::PARAM_TABLE[Params::PARAM_TABLE.len() - 1]
     .1
-    .polynomial_degree as usize;
+    .polynomial_degree;
 
 #[derive(Clone, Copy)]
 pub struct Params {
     pub rational_base_size: usize,
     pub algebraic_base_size: usize,
     pub quad_char_base_size: usize,
-    pub polynomial_degree: u32,
+    pub polynomial_degree: usize,
     pub sieve_array_size: usize,
     pub fudge: i8, // different fudge for rational and algebraic side?
 }
