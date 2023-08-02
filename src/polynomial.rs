@@ -28,7 +28,7 @@ where
 pub struct MpPolynomial([Integer; MAX_DEGREE + 1]);
 
 impl MpPolynomial {
-    fn new() -> MpPolynomial {
+    pub fn new() -> MpPolynomial {
         MpPolynomial([Integer::ZERO; MAX_DEGREE + 1])
     }
 

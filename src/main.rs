@@ -10,6 +10,7 @@ mod sqrt;
 use std::env;
 use std::io;
 
+use rug::Complete;
 use rug::{ops::Pow, Integer};
 
 fn read_int<T: std::str::FromStr>() -> T
@@ -36,7 +37,10 @@ fn main() {
     let s = read_int::<i32>();
 
     let n: Integer = Integer::from(r).pow(e) - s;
-    let a = nfs::factorize(r, e, s);
+    let factors = nfs::factorize(r, e, s);
 
-    println!("Number factored as {} * {}", &a, n / &a);
+    println!("Found the following factorizations:\n");
+    for a in factors {
+        println!("{} * {}", &a, (&n / &a).complete());
+    }
 }

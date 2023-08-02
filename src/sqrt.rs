@@ -117,8 +117,8 @@ fn inv_sqrt_mod_p(s: &GfPolynomial, f: &GfPolynomial) -> GfPolynomial {
 }
 
 // Caclculates the square root of the product of a set of rational integers.
-pub fn rational_sqrt(integers: Vec<Integer>) -> Integer {
-    mul_rational_integers(&integers).sqrt()
+pub fn rational_sqrt(integers: &Vec<Integer>) -> Integer {
+    mul_rational_integers(integers).sqrt()
 }
 
 fn mul_rational_integers(integers: &[Integer]) -> Integer {

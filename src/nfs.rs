@@ -1,4 +1,4 @@
-use std::cmp::max;
+use std::cmp::{max, min};
 
 use rug::{
     ops::{NegAssign, Pow},
@@ -11,6 +11,7 @@ use crate::{
     nt,
     params::Params,
     polynomial::{self, MpPolynomial},
+    sqrt,
 };
 
 fn rational_factor_base(m: &Integer, params: &Params) -> Vec<(u32, u32)> {
@@ -80,7 +81,7 @@ fn line_sieve(b: u32, sieve_array: &mut Vec<i8>, base: &Vec<(u32, u32)>) {
     }
 }
 
-pub fn factorize(r: u32, e: u32, s: i32) -> Integer {
+pub fn factorize(r: u32, e: u32, s: i32) -> Vec<Integer> {
     let n: Integer = Integer::from(r).pow(e) - s;
 
     let params = Params::new(&n);
@@ -164,7 +165,34 @@ pub fn factorize(r: u32, e: u32, s: i32) -> Integer {
         }
     }
 
-    let dependencies = lanczos::find_dependencies(&matrix_builder.build());
+    let (mat, num_dependencies) = lanczos::find_dependencies(&matrix_builder.build());
+    let mut factors: Vec<Integer> = Vec::new();
 
-    todo!()
+    for i in 0..num_dependencies {
+        let mut rational: Vec<Integer> = Vec::new();
+        let mut algebraic: Vec<MpPolynomial> = Vec::new();
+
+        for (j, (a, b)) in relations.iter().enumerate() {
+            if (mat[j] >> i) & 1 == 1 {
+                rational.push(a + (b * &m).complete());
+                let mut g = MpPolynomial::new();
+                g[0] = Integer::from(*a);
+                g[1] = Integer::from(*b);
+                algebraic.push(g);
+            }
+        }
+
+        let a = sqrt::rational_sqrt(&rational);
+        let b = sqrt::algebraic_sqrt(&algebraic, &f).evaluate(&m);
+
+        let d = (&a - &b).complete().gcd(&n);
+        if d != 1 && d != b {
+            factors.push(min(d, (&b - &a).complete().gcd(&n)));
+        }
+    }
+
+    factors.sort();
+    factors.dedup();
+
+    factors
 }
