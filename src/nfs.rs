@@ -10,7 +10,7 @@ use crate::{
     linalg::CscMatrixBuilder,
     nt,
     params::Params,
-    polynomial::{self, MpPolynomial},
+    polynomial::{self, MpPolynomial, Polynomial},
     sqrt,
 };
 
@@ -81,6 +81,21 @@ fn line_sieve(b: u32, sieve_array: &mut Vec<i8>, base: &Vec<(u32, u32)>) {
     }
 }
 
+fn norm(f: &MpPolynomial, a: i32, b: u32) -> Integer {
+    let d = f.degree();
+    let mut u = Integer::from(1);
+    let mut v = Integer::from(b).pow(d as u32);
+    let mut result = Integer::new();
+
+    for coefficient in f.coefficients_ref().iter().take(d + 1) {
+        result += coefficient * (&u * &v).complete();
+        u *= a;
+        v /= b;
+    }
+
+    result
+}
+
 pub fn factorize(r: u32, e: u32, s: i32) -> Vec<Integer> {
     let n: Integer = Integer::from(r).pow(e) - s;
 
@@ -125,28 +140,28 @@ pub fn factorize(r: u32, e: u32, s: i32) -> Vec<Integer> {
                 let mut ones_pos: Vec<u32> = Vec::new();
 
                 // Trial divide on the rational side.
-                let mut x = a + (b * &m).complete();
-                if x < 0 {
+                let mut num = a + (b * &m).complete();
+                if num < 0 {
                     ones_pos.push(0);
-                    x.neg_assign();
+                    num.neg_assign();
                 }
                 for (i, (p, _)) in rational_base.iter().enumerate() {
-                    let e = x.remove_factor_mut(&Integer::from(*p));
+                    let e = num.remove_factor_mut(&Integer::from(*p));
                     if e & 1 == 1 {
                         ones_pos.push((rational_begin + i) as u32);
                     }
                 }
 
-                // Trial divide on the algebraic side. TODO: FIX NORM COMPUTATION
-                let mut y = Integer::new();
+                // Trial divide on the algebraic side.
+                let mut alg_norm = norm(&f, a, b);
                 for (i, (p, _)) in algebraic_base.iter().enumerate() {
-                    let e = y.remove_factor_mut(&Integer::from(*p));
+                    let e = alg_norm.remove_factor_mut(&Integer::from(*p));
                     if e & 1 == 1 {
                         ones_pos.push((algebraic_begin + i) as u32);
                     }
                 }
 
-                if x == 1 && y == 1 {
+                if num == 1 && alg_norm == 1 {
                     // smooth pair (a, b) found!
                     for (i, (p, s)) in quad_char_base.iter().enumerate() {
                         if nt::legendre(
