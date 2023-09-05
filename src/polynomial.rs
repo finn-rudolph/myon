@@ -53,8 +53,8 @@ impl MpPolynomial {
         f
     }
 
-    pub fn find_roots_mod_p(&self, p: u32) -> Vec<u32> {
-        let mut roots: Vec<u32> = Vec::new();
+    pub fn find_roots_mod_p(&self, p: u64) -> Vec<u64> {
+        let mut roots: Vec<u64> = Vec::new();
 
         let mut i = 0;
         while i < p {
@@ -72,8 +72,8 @@ impl MpPolynomial {
     pub fn mul_mod(&self, f: &MpPolynomial, g: &MpPolynomial) -> MpPolynomial {
         let d = self.degree();
 
-        // Initialize result with the leading coefficient of self times rhs. This means, the powers
-        // of alpha present in the result are actually shifted up by d - 1.
+        // Initialize result with the leading coefficient of f times g. This means, the powers
+        // of x present in the result are actually shifted up by d - 1.
         let mut result = MpPolynomial::new();
         for i in 0..d {
             result[i] = (&g[i] * &f[d - 1]).into();
@@ -81,19 +81,16 @@ impl MpPolynomial {
 
         // In each iteration, the leading coffiecient is converted to lower order terms, and the
         // i-th coefficient of self times rhs is added. Thus, the shift in the exponents of powers
-        // of alpha is reduced by 1.
+        // of x is reduced by 1.
         for i in (0..d - 1).rev() {
             let mut leading_coefficient = Integer::new();
             for coefficient in &mut result.0 {
                 swap(&mut leading_coefficient, coefficient);
             }
 
-            for (j, coefficient) in result.0.iter_mut().enumerate() {
-                *coefficient -= &leading_coefficient * &self[j];
-            }
-
-            for j in 0..d {
+            for j in 0..d - 1 {
                 result[j] += &g[j] * &f[i];
+                result[j] -= &leading_coefficient * &self[j];
             }
         }
 
@@ -104,7 +101,7 @@ impl MpPolynomial {
 impl Polynomial<Integer> for MpPolynomial {
     fn degree(&self) -> usize {
         let mut d = MAX_DEGREE;
-        while self[d] == 0 {
+        while d > 0 && self[d] == 0 {
             d -= 1;
         }
         d

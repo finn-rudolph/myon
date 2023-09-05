@@ -1,7 +1,7 @@
 use core::mem::swap;
 use std::ops::{Index, IndexMut};
 
-use rug::{ops::Pow, Complete, Integer};
+use rug::{integer::IntegerExt64, ops::Pow, Complete, Integer};
 
 use crate::{
     nt,
@@ -11,27 +11,27 @@ use crate::{
 
 #[derive(Clone)]
 pub struct GfPolynomial {
-    coefficients: [u32; MAX_DEGREE + 1],
-    modulus: u32,
+    coefficients: [u64; MAX_DEGREE + 1],
+    modulus: u64,
 }
 
 impl GfPolynomial {
-    pub fn new(modulus: u32) -> GfPolynomial {
+    pub fn new(modulus: u64) -> GfPolynomial {
         GfPolynomial {
             coefficients: [0; MAX_DEGREE + 1],
             modulus,
         }
     }
 
-    pub fn from_mp_polynomial(f: &MpPolynomial, modulus: u32) -> GfPolynomial {
+    pub fn from_mp_polynomial(f: &MpPolynomial, modulus: u64) -> GfPolynomial {
         let mut g = GfPolynomial::new(modulus);
         for i in 0..=MAX_DEGREE {
-            g[i] = f[i].mod_u(modulus);
+            g[i] = f[i].mod_u64(modulus);
         }
         g
     }
 
-    pub fn modulus(&self) -> u32 {
+    pub fn modulus(&self) -> u64 {
         self.modulus
     }
 
@@ -49,22 +49,21 @@ impl GfPolynomial {
 
         let mut result = GfPolynomial::new(self.modulus);
         for i in 0..d {
-            result[i] = ((g[i] as u64 * f[d - 1] as u64) % p as u64) as u32;
+            result[i] = (g[i] * f[d - 1]) % p;
         }
 
         for i in (0..d - 1).rev() {
-            let mut leading_coefficient = 0u32;
+            let mut leading_coefficient = 0u64;
             for coefficient in &mut result.coefficients {
                 swap(&mut leading_coefficient, coefficient);
             }
 
             for (j, coefficient) in result.coefficients.iter_mut().enumerate() {
-                *coefficient +=
-                    p - ((leading_coefficient as u64 * self[j] as u64) % p as u64) as u32;
+                *coefficient += p - (leading_coefficient * self[j]) % p;
             }
 
             for j in 0..d {
-                result[j] = ((result[j] as u64 + g[j] as u64 * f[i] as u64) % p as u64) as u32;
+                result[j] = (result[j] + g[j] * f[i]) % p;
             }
         }
 
@@ -77,11 +76,9 @@ impl GfPolynomial {
         let modulus_leading_inv = nt::mod_inv(modulus[e], p);
 
         for i in (e..=d).rev() {
-            let quotient = ((self[i] as u64 * modulus_leading_inv as u64) % p as u64) as u32;
+            let quotient = (self[i] * modulus_leading_inv) % p;
             for j in 0..=e {
-                self[j + i - e] = (self[j + i - e] + p
-                    - ((quotient as u64 * modulus[j] as u64) % p as u64) as u32)
-                    % p;
+                self[j + i - e] = (self[j + i - e] + p - (quotient * modulus[j]) % p) % p;
             }
         }
 
@@ -118,7 +115,7 @@ impl GfPolynomial {
 
         let mut prime_divisors: Vec<u32> = Vec::new();
         for q in 2..=d {
-            if d % q == 0 && nt::miller_rabin(q as u32) {
+            if d % q == 0 && nt::miller_rabin(q as u64) {
                 prime_divisors.push(q as u32);
             }
         }
@@ -135,45 +132,45 @@ impl GfPolynomial {
             }
         }
 
-        let mut h = self.pow_mod(x.clone(), Integer::from(p).pow(d as u32));
-        h[1] = (h[1] + p - 1) % p;
+        let mut g = self.pow_mod(x.clone(), Integer::from(p).pow(d as u32));
+        g[1] = (g[1] + p - 1) % p;
 
-        h.degree() == 0 && h[0] == 0
+        g.degree() == 0 && g[0] == 0
     }
 }
 
-impl Polynomial<u32> for GfPolynomial {
+impl Polynomial<u64> for GfPolynomial {
     fn degree(&self) -> usize {
         let mut d = MAX_DEGREE;
-        while self[d] == 0 {
+        while d > 0 && self[d] == 0 {
             d -= 1;
         }
         d
     }
 
-    fn coefficients(self) -> [u32; MAX_DEGREE + 1] {
+    fn coefficients(self) -> [u64; MAX_DEGREE + 1] {
         self.coefficients
     }
 
-    fn coefficients_ref(&self) -> &[u32; MAX_DEGREE + 1] {
+    fn coefficients_ref(&self) -> &[u64; MAX_DEGREE + 1] {
         &self.coefficients
     }
 
-    fn coefficients_mut(&mut self) -> &mut [u32; MAX_DEGREE + 1] {
+    fn coefficients_mut(&mut self) -> &mut [u64; MAX_DEGREE + 1] {
         &mut self.coefficients
     }
 }
 
 impl Index<usize> for GfPolynomial {
-    type Output = u32;
+    type Output = u64;
 
-    fn index(&self, i: usize) -> &u32 {
+    fn index(&self, i: usize) -> &u64 {
         &self.coefficients[i]
     }
 }
 
 impl IndexMut<usize> for GfPolynomial {
-    fn index_mut(&mut self, i: usize) -> &mut u32 {
+    fn index_mut(&mut self, i: usize) -> &mut u64 {
         &mut self.coefficients[i]
     }
 }
@@ -219,12 +216,9 @@ impl GfMpPolynomial {
                 swap(&mut leading_coefficient, coefficient);
             }
 
-            for (j, coefficient) in result.coefficients.iter_mut().enumerate() {
-                *coefficient += p - (&leading_coefficient * &self[j]).complete() % p;
-            }
-
-            for j in 0..d {
+            for j in 0..d - 1 {
                 result[j] += &g[j] * &f[i];
+                result[j] += p - (&leading_coefficient * &self[j]).complete() % p;
                 result[j] %= p;
             }
         }
@@ -236,7 +230,7 @@ impl GfMpPolynomial {
 impl Polynomial<Integer> for GfMpPolynomial {
     fn degree(&self) -> usize {
         let mut d = MAX_DEGREE;
-        while self[d] == 0 {
+        while d > 0 && self[d] == 0 {
             d -= 1;
         }
         d

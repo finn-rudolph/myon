@@ -15,6 +15,9 @@ use crate::{
 // to multiply two numbers in the order of magnitude of the result.
 pub fn algebraic_sqrt(integers: &Vec<MpPolynomial>, f: &MpPolynomial) -> MpPolynomial {
     let s = mul_algebraic_integers(integers, f);
+
+    info!("calculated the product of the algebraic integers");
+
     let p = select_p(f);
 
     info!("chose the prime for lifting p = {}", p);
@@ -57,6 +60,8 @@ pub fn algebraic_sqrt(integers: &Vec<MpPolynomial>, f: &MpPolynomial) -> MpPolyn
         r = t;
     }
 
+    info!("finished lifting");
+
     MpPolynomial::from(r)
 }
 
@@ -70,8 +75,8 @@ fn mul_algebraic_integers(integers: &[MpPolynomial], f: &MpPolynomial) -> MpPoly
     )
 }
 
-fn select_p(f: &MpPolynomial) -> u32 {
-    let mut p: u32 = 100000007;
+fn select_p(f: &MpPolynomial) -> u64 {
+    let mut p: u64 = 100000007;
     loop {
         // p must be inert in the number field, which means f must be irreducible mod p.
         if nt::miller_rabin(p) && GfPolynomial::from_mp_polynomial(f, p).is_irreducible() {
@@ -134,7 +139,10 @@ fn inv_sqrt_mod_p(s: &GfPolynomial, f: &GfPolynomial) -> GfPolynomial {
 
 // Caclculates the square root of the product of a set of rational integers.
 pub fn rational_sqrt(integers: &Vec<Integer>) -> Integer {
-    mul_rational_integers(integers).sqrt()
+    let prod = mul_rational_integers(integers);
+    assert!(prod.is_perfect_square());
+    info!("calculated rational sqrt");
+    prod.sqrt()
 }
 
 fn mul_rational_integers(integers: &[Integer]) -> Integer {

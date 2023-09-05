@@ -18,8 +18,8 @@ pub(crate) use block_matrix;
 // in 'ones'. The index after the last element of column i is end[i].
 pub struct CscMatrix {
     num_rows: usize,
-    end: Vec<u32>, // number of columns = end.len()
-    ones: Vec<u32>,
+    end: Vec<usize>, // number of columns = end.len()
+    ones: Vec<usize>,
 }
 
 pub struct CscMatrixTranspose<'a> {
@@ -36,7 +36,7 @@ pub struct BlockMatrixTranspose<'a> {
 }
 
 impl CscMatrix {
-    pub fn new(num_rows: usize, end: Vec<u32>, ones: Vec<u32>) -> CscMatrix {
+    pub fn new(num_rows: usize, end: Vec<usize>, ones: Vec<usize>) -> CscMatrix {
         CscMatrix {
             num_rows,
             end,
@@ -45,8 +45,8 @@ impl CscMatrix {
     }
 
     pub fn new_random(num_cols: usize, num_rows: usize, max_ones: usize) -> CscMatrix {
-        let mut end: Vec<u32> = vec![];
-        let mut ones: Vec<u32> = vec![];
+        let mut end: Vec<usize> = vec![];
+        let mut ones: Vec<usize> = vec![];
         let mut used: Vec<bool> = vec![false; num_rows];
 
         let mut rng = thread_rng();
@@ -60,10 +60,10 @@ impl CscMatrix {
                 while used[x] {
                     x = rng.gen_range(0..=max_ones);
                 }
-                ones.push(x as u32);
+                ones.push(x);
                 used[x] = true;
             }
-            end.push(ones.len() as u32);
+            end.push(ones.len());
             for i in 0..weight {
                 used[ones[ones.len() - i - 1] as usize] = false;
             }
@@ -93,8 +93,8 @@ impl CscMatrix {
 
 pub struct CscMatrixBuilder {
     num_rows: usize,
-    end: Vec<u32>,
-    ones: Vec<u32>,
+    end: Vec<usize>,
+    ones: Vec<usize>,
 }
 
 impl CscMatrixBuilder {
@@ -106,9 +106,9 @@ impl CscMatrixBuilder {
         }
     }
 
-    pub fn add_col(&mut self, mut ones_pos: Vec<u32>) {
+    pub fn add_col(&mut self, mut ones_pos: Vec<usize>) {
         self.ones.append(&mut ones_pos);
-        self.end.push(self.ones.len() as u32)
+        self.end.push(self.ones.len())
     }
 
     pub fn set_num_rows(&mut self, num_rows: usize) {

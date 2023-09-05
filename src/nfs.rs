@@ -2,6 +2,7 @@ use std::cmp::min;
 
 use log::info;
 use rug::{
+    integer::IntegerExt64,
     ops::{NegAssign, Pow},
     Complete, Integer,
 };
@@ -15,13 +16,13 @@ use crate::{
     sqrt,
 };
 
-fn rational_factor_base(m: &Integer, params: &Params) -> Vec<(u32, u32)> {
-    let mut base: Vec<(u32, u32)> = Vec::new();
+fn rational_factor_base(m: &Integer, params: &Params) -> Vec<(u64, u64)> {
+    let mut base: Vec<(u64, u64)> = Vec::new();
 
-    let mut p: u32 = 2;
+    let mut p: u64 = 2;
     while base.len() < params.rational_base_size {
         if nt::miller_rabin(p) {
-            base.push((p, m.mod_u(p)));
+            base.push((p, m.mod_u64(p)));
         }
         p += 1;
     }
@@ -29,9 +30,9 @@ fn rational_factor_base(m: &Integer, params: &Params) -> Vec<(u32, u32)> {
     base
 }
 
-fn algebraic_factor_base(f: &MpPolynomial, params: &Params) -> Vec<(u32, u32)> {
-    let mut base: Vec<(u32, u32)> = Vec::new();
-    let mut p: u32 = 2;
+fn algebraic_factor_base(f: &MpPolynomial, params: &Params) -> Vec<(u64, u64)> {
+    let mut base: Vec<(u64, u64)> = Vec::new();
+    let mut p: u64 = 2;
 
     while base.len() < params.algebraic_base_size {
         if nt::miller_rabin(p) {
@@ -45,8 +46,8 @@ fn algebraic_factor_base(f: &MpPolynomial, params: &Params) -> Vec<(u32, u32)> {
     base
 }
 
-fn quad_char_base(mut p: u32, f: &MpPolynomial, params: &Params) -> Vec<(u32, u32)> {
-    let mut base: Vec<(u32, u32)> = Vec::new();
+fn quad_char_base(mut p: u64, f: &MpPolynomial, params: &Params) -> Vec<(u64, u64)> {
+    let mut base: Vec<(u64, u64)> = Vec::new();
     let f_derivative = f.derivative();
 
     while base.len() < params.quad_char_base_size {
@@ -65,16 +66,16 @@ fn quad_char_base(mut p: u32, f: &MpPolynomial, params: &Params) -> Vec<(u32, u3
     base
 }
 
-fn ilog2_rounded(x: u32) -> u32 {
+fn ilog2_rounded(x: u64) -> u32 {
     ((x * x).ilog2() + 1) >> 1
 }
 
-fn line_sieve(b: u32, sieve_array: &mut Vec<i8>, base: &Vec<(u32, u32)>) {
-    let a0: i32 = -(sieve_array.len() as i32 / 2);
+fn line_sieve(b: u64, sieve_array: &mut Vec<i8>, base: &Vec<(u64, u64)>) {
+    let a0: i64 = -(sieve_array.len() as i64 / 2);
 
     for (p, r) in base {
         let log2p = ilog2_rounded(*p) as i8;
-        let mut i = ((-((b * r) as i32) % *p as i32 + *p as i32 - a0) % *p as i32) as usize;
+        let mut i = ((-((b * r) as i64) % *p as i64 + *p as i64 - a0) % *p as i64) as usize;
         while i < sieve_array.len() {
             sieve_array[i] += log2p;
             i += *p as usize;
@@ -82,7 +83,7 @@ fn line_sieve(b: u32, sieve_array: &mut Vec<i8>, base: &Vec<(u32, u32)>) {
     }
 }
 
-fn norm(f: &MpPolynomial, a: i32, b: u32) -> Integer {
+fn norm(f: &MpPolynomial, a: i64, b: u64) -> Integer {
     let d = f.degree();
     let mut u = Integer::from(1);
     let mut v = Integer::from(b).pow(d as u32);
@@ -125,7 +126,7 @@ pub fn factorize(n: &Integer) -> Vec<Integer> {
 
     let mut matrix_builder = CscMatrixBuilder::new();
     matrix_builder.set_num_rows(quad_char_begin + quad_char_base.len());
-    let mut relations: Vec<(u32, u32)> = Vec::new();
+    let mut relations: Vec<(i64, u64)> = Vec::new();
 
     let mut rational_sieve_array: Vec<i8> = vec![0; params.sieve_array_size];
     let mut algebraic_sieve_array: Vec<i8> = vec![0; params.sieve_array_size];
@@ -138,12 +139,12 @@ pub fn factorize(n: &Integer) -> Vec<Integer> {
         algebraic_sieve_array.fill(-params.algebraic_threshold);
         line_sieve(b, &mut algebraic_sieve_array, &algebraic_base);
 
-        let a0 = -(params.sieve_array_size as i32 / 2);
+        let a0 = -(params.sieve_array_size as i64 / 2);
         // Consider unsafe access here to avoid bounds checks.
         for i in 0..params.sieve_array_size {
             if rational_sieve_array[i] >= 0 && algebraic_sieve_array[i] >= 0 {
-                let a = a0 + i as i32;
-                let mut ones_pos: Vec<u32> = Vec::new();
+                let a = a0 + i as i64;
+                let mut ones_pos: Vec<usize> = Vec::new();
 
                 // Trial divide on the rational side.
                 let mut num = a + (b * &m).complete();
@@ -154,7 +155,7 @@ pub fn factorize(n: &Integer) -> Vec<Integer> {
                 for (i, (p, _)) in rational_base.iter().enumerate() {
                     let e = num.remove_factor_mut(&Integer::from(*p));
                     if e & 1 == 1 {
-                        ones_pos.push((rational_begin + i) as u32);
+                        ones_pos.push(rational_begin + i);
                     }
                 }
 
@@ -163,7 +164,7 @@ pub fn factorize(n: &Integer) -> Vec<Integer> {
                 for (i, (p, _)) in algebraic_base.iter().enumerate() {
                     let e = alg_norm.remove_factor_mut(&Integer::from(*p));
                     if e & 1 == 1 {
-                        ones_pos.push((algebraic_begin + i) as u32);
+                        ones_pos.push(algebraic_begin + i);
                     }
                 }
 
@@ -171,16 +172,16 @@ pub fn factorize(n: &Integer) -> Vec<Integer> {
                     // smooth pair (a, b) found!
                     for (i, (p, s)) in quad_char_base.iter().enumerate() {
                         if nt::legendre(
-                            (((a + b as i32 * *s as i32) % *p as i32 + *p as i32) % *p as i32)
-                                as u32,
+                            (((a + b as i64 * *s as i64) % *p as i64 + *p as i64) % *p as i64)
+                                as u64,
                             *p,
                         ) == p - 1
                         {
-                            ones_pos.push((quad_char_begin + i) as u32);
+                            ones_pos.push(quad_char_begin + i);
                         }
                     }
                     matrix_builder.add_col(ones_pos);
-                    relations.push((a as u32, b));
+                    relations.push((a, b));
                 }
             }
         }
@@ -196,9 +197,21 @@ pub fn factorize(n: &Integer) -> Vec<Integer> {
     let (mat, num_dependencies) = lanczos::find_dependencies(&matrix_builder.build());
     let mut factors: Vec<Integer> = Vec::new();
 
-    info!("beginning sqrt phase");
-
     for i in 0..num_dependencies {
+        info!(
+            "processing {}-{} dependency",
+            i,
+            if i % 10 == 1 {
+                "st"
+            } else if i % 10 == 2 {
+                "nd"
+            } else if i % 10 == 3 {
+                "rd"
+            } else {
+                "th"
+            }
+        );
+
         let mut rational: Vec<Integer> = Vec::new();
         let mut algebraic: Vec<MpPolynomial> = Vec::new();
 
