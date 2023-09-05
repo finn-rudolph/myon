@@ -84,11 +84,11 @@ impl MpPolynomial {
         // of x is reduced by 1.
         for i in (0..d - 1).rev() {
             let mut leading_coefficient = Integer::new();
-            for coefficient in &mut result.0 {
+            for coefficient in result.coefficients_mut().iter_mut().take(d) {
                 swap(&mut leading_coefficient, coefficient);
             }
 
-            for j in 0..d - 1 {
+            for j in 0..d {
                 result[j] += &g[j] * &f[i];
                 result[j] -= &leading_coefficient * &self[j];
             }

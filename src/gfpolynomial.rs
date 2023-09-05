@@ -54,16 +54,14 @@ impl GfPolynomial {
 
         for i in (0..d - 1).rev() {
             let mut leading_coefficient = 0u64;
-            for coefficient in &mut result.coefficients {
+            for coefficient in result.coefficients_mut().iter_mut().take(d) {
                 swap(&mut leading_coefficient, coefficient);
             }
 
-            for (j, coefficient) in result.coefficients.iter_mut().enumerate() {
-                *coefficient += p - (leading_coefficient * self[j]) % p;
-            }
-
             for j in 0..d {
-                result[j] = (result[j] + g[j] * f[i]) % p;
+                result[j] += g[j] * f[i];
+                result[j] += p - (leading_coefficient * self[j]) % p;
+                result[j] %= p;
             }
         }
 
@@ -212,11 +210,11 @@ impl GfMpPolynomial {
 
         for i in (0..d - 1).rev() {
             let mut leading_coefficient = Integer::new();
-            for coefficient in &mut result.coefficients {
+            for coefficient in result.coefficients_mut().iter_mut().take(d) {
                 swap(&mut leading_coefficient, coefficient);
             }
 
-            for j in 0..d - 1 {
+            for j in 0..d {
                 result[j] += &g[j] * &f[i];
                 result[j] += p - (&leading_coefficient * &self[j]).complete() % p;
                 result[j] %= p;
