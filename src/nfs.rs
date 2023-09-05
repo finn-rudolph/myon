@@ -1,4 +1,4 @@
-use std::cmp::min;
+use std::{cmp::min, mem::swap};
 
 use log::info;
 use rug::{
@@ -200,12 +200,12 @@ pub fn factorize(n: &Integer) -> Vec<Integer> {
     for i in 0..num_dependencies {
         info!(
             "processing {}-{} dependency",
-            i,
-            if i % 10 == 1 {
+            i + 1,
+            if i % 10 == 0 {
                 "st"
-            } else if i % 10 == 2 {
+            } else if i % 10 == 1 {
                 "nd"
-            } else if i % 10 == 3 {
+            } else if i % 10 == 2 {
                 "rd"
             } else {
                 "th"
@@ -225,16 +225,20 @@ pub fn factorize(n: &Integer) -> Vec<Integer> {
             }
         }
 
-        let a = sqrt::rational_sqrt(&rational);
-        let b = sqrt::algebraic_sqrt(&algebraic, &f).evaluate(&m);
+        let mut a = sqrt::rational_sqrt(&rational);
+        let mut b = sqrt::algebraic_sqrt(&algebraic, &f).evaluate(&m) * f.derivative().evaluate(&m);
+
+        if a < b {
+            swap(&mut a, &mut b);
+        }
 
         let d = (&a - &b).complete().gcd(&n);
-        if d != 1 && d != b {
-            factors.push(min(d, (&b - &a).complete().gcd(&n)));
+        if d != 1 && &d != n {
+            factors.push(min((n / &d).complete(), d));
         }
     }
 
-    factors.sort();
+    factors.sort_unstable();
     factors.dedup();
 
     factors

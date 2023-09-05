@@ -140,6 +140,12 @@ impl From<GfMpPolynomial> for MpPolynomial {
     }
 }
 
+impl From<&GfMpPolynomial> for MpPolynomial {
+    fn from(f: &GfMpPolynomial) -> MpPolynomial {
+        MpPolynomial(f.coefficients_ref().clone())
+    }
+}
+
 impl Display for MpPolynomial {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut s = String::new();

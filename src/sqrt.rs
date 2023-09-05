@@ -2,7 +2,7 @@ use std::cmp::max;
 
 use log::info;
 use rand::{thread_rng, Rng};
-use rug::{ops::Pow, Complete, Integer};
+use rug::{ops::Pow, Integer};
 
 use crate::{
     gfpolynomial::{GfMpPolynomial, GfPolynomial},
@@ -29,40 +29,67 @@ pub fn algebraic_sqrt(integers: &Vec<MpPolynomial>, f: &MpPolynomial) -> MpPolyn
 
     info!("calculated initial inverse sqrt");
 
-    let max_coeffiecient = s
+    let num_iterations = (s
         .coefficients_ref()
         .iter()
-        .fold(Integer::new(), |acc, x| max(acc, x.clone().abs()));
+        .fold(Integer::new(), |acc, x| max(acc, x.clone().abs()))
+        .significant_bits()
+        / p.ilog2())
+    .ilog2()
+        + 6;
 
-    info!(
-        "estimated the size of the largest coefficient to be around {} bits",
-        max_coeffiecient.significant_bits()
-    );
+    info!("doing {} iterations of newtons method", num_iterations);
 
     let mut q = Integer::from(p);
 
-    while &q < &max_coeffiecient {
+    for _ in 0..num_iterations {
         q.square_mut();
         let f_mod_q = GfMpPolynomial::from_mp_polynomial(f, q.clone());
         let mut t = f_mod_q.mul_mod(
             &GfMpPolynomial::from_mp_polynomial(&s, q.clone()),
             &f_mod_q.mul_mod(&r, &r),
         );
-        t[0] = ((3u32 - &t[0]).complete() + &q) % &q;
+        for coefficient in t.coefficients_mut() {
+            *coefficient = (&q - coefficient.clone()) % &q;
+        }
+        t[0] += 3;
+        t[0] %= &q;
         t = f_mod_q.mul_mod(&r, &t);
 
         let two_inv = Integer::from(2).invert(&q).unwrap();
 
         for coefficient in t.coefficients_mut() {
-            *coefficient = (coefficient.clone() * &two_inv) % &q;
+            *coefficient *= &two_inv;
+            *coefficient %= &q;
         }
 
         r = t;
+
+        let h = f_mod_q.mul_mod(
+            &GfMpPolynomial::from_mp_polynomial(&s, q.clone()),
+            &f_mod_q.mul_mod(&r, &r),
+        );
+        assert_eq!(h.degree(), 0);
+        assert_eq!(h[0], 1);
     }
 
-    info!("finished lifting");
+    let f_mod_q = GfMpPolynomial::from_mp_polynomial(f, q.clone());
+    let result_mod_q = f_mod_q.mul_mod(&GfMpPolynomial::from_mp_polynomial(&s, q.clone()), &r);
 
-    f.mul_mod(&MpPolynomial::from(r), &s)
+    let mut result = MpPolynomial::new();
+    for (i, coefficient) in result_mod_q.coefficients().into_iter().enumerate() {
+        result[i] = coefficient;
+        if result[i].significant_bits() >= q.significant_bits() - 2 {
+            // When a coefficient is such large, we assume it's actually negative.
+            result[i] -= &q;
+        }
+    }
+
+    let h = f.mul_mod(&s, &f.mul_mod(&result, &result));
+    assert_eq!(h.degree(), 0);
+    assert_eq!(h[0], 1);
+
+    result
 }
 
 fn mul_algebraic_integers(integers: &[MpPolynomial], f: &MpPolynomial) -> MpPolynomial {
@@ -115,8 +142,8 @@ fn inv_sqrt_mod_p(s: &GfPolynomial, f: &GfPolynomial) -> GfPolynomial {
             e >>= 1;
         }
 
-        let z = f.mul_mod(s, &f.mul_mod(&v.1, &v.1));
-        if z.degree() == 0 && z[0] == 1 {
+        let g = f.mul_mod(s, &f.mul_mod(&v.1, &v.1));
+        if g.degree() == 0 && g[0] == 1 {
             return v.1;
         }
     }

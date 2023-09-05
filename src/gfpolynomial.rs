@@ -45,7 +45,7 @@ impl GfPolynomial {
     // Same routine as in the general polynomial case.
     pub fn mul_mod(&self, f: &GfPolynomial, g: &GfPolynomial) -> GfPolynomial {
         let d = self.degree();
-        let p = self.modulus;
+        let p = self.modulus();
 
         let mut result = GfPolynomial::new(self.modulus);
         for i in 0..d {
@@ -189,7 +189,8 @@ impl GfMpPolynomial {
     pub fn from_mp_polynomial(f: &MpPolynomial, modulus: Integer) -> GfMpPolynomial {
         let mut g = GfMpPolynomial::new(modulus);
         for (i, coefficient) in f.coefficients_ref().iter().enumerate() {
-            g.coefficients[i] = Integer::from(coefficient) % &g.modulus;
+            g.coefficients[i] =
+                ((coefficient % g.modulus()).complete() + g.modulus()) % g.modulus();
         }
         g
     }
