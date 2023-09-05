@@ -4,7 +4,7 @@ use std::{
     ops::{Index, IndexMut, MulAssign},
 };
 
-use rug::{Complete, Integer};
+use rug::{integer::IntegerExt64, Complete, Integer};
 
 use crate::{
     gfpolynomial::GfMpPolynomial,
@@ -58,7 +58,7 @@ impl MpPolynomial {
 
         let mut i = 0;
         while i < p {
-            if self.evaluate(i) % p == 0 {
+            if self.evaluate(i).is_divisible_u64(p) {
                 roots.push(i);
             }
             i += 1;

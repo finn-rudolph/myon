@@ -14,7 +14,10 @@ use crate::{
 // Uses divide and conquer to evaluate the product in O(M log n) time, where M is the time needed
 // to multiply two numbers in the order of magnitude of the result.
 pub fn algebraic_sqrt(integers: &Vec<MpPolynomial>, f: &MpPolynomial) -> MpPolynomial {
-    let s = mul_algebraic_integers(integers, f);
+    let s = f.mul_mod(
+        &mul_algebraic_integers(integers, f),
+        &f.mul_mod(&f.derivative(), &f.derivative()),
+    );
 
     info!("calculated the product of the algebraic integers");
 
@@ -85,9 +88,10 @@ pub fn algebraic_sqrt(integers: &Vec<MpPolynomial>, f: &MpPolynomial) -> MpPolyn
         }
     }
 
-    let h = f.mul_mod(&s, &f.mul_mod(&result, &result));
-    assert_eq!(h.degree(), 0);
-    assert_eq!(h[0], 1);
+    let h = f.mul_mod(&result, &result);
+    for (i, coefficient) in h.coefficients().iter().enumerate() {
+        assert_eq!(coefficient, &s[i]);
+    }
 
     result
 }

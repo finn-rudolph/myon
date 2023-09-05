@@ -53,9 +53,9 @@ fn quad_char_base(mut p: u64, f: &MpPolynomial, params: &Params) -> Vec<(u64, u6
     while base.len() < params.quad_char_base_size {
         if nt::miller_rabin(p) {
             let roots = f.find_roots_mod_p(p);
-            for r in roots {
-                if f_derivative.evaluate(r) % p != 0 {
-                    base.push((p, r));
+            for s in roots {
+                if !f_derivative.evaluate(s).is_divisible_u64(p) {
+                    base.push((p, s));
                 }
             }
         }
@@ -226,7 +226,7 @@ pub fn factorize(n: &Integer) -> Vec<Integer> {
         }
 
         let mut a = sqrt::rational_sqrt(&rational);
-        let mut b = sqrt::algebraic_sqrt(&algebraic, &f).evaluate(&m) * f.derivative().evaluate(&m);
+        let mut b = sqrt::algebraic_sqrt(&algebraic, &f).evaluate(&m);
 
         if a < b {
             swap(&mut a, &mut b);
