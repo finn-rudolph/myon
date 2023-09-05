@@ -1,5 +1,8 @@
 use core::mem::swap;
-use std::ops::{Index, IndexMut, MulAssign};
+use std::{
+    fmt::Display,
+    ops::{Index, IndexMut, MulAssign},
+};
 
 use rug::{Complete, Integer};
 
@@ -140,6 +143,19 @@ impl From<GfMpPolynomial> for MpPolynomial {
     }
 }
 
+impl Display for MpPolynomial {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut s = String::new();
+        for i in (0..=self.degree()).rev() {
+            s.push_str(&format!("{} * x^{}", self[i], i));
+            if i != 0 {
+                s.push_str(" + ");
+            }
+        }
+        write!(f, "{}", s)
+    }
+}
+
 // Naive polynomial selection for general integers. Returns the selected polynomial and an integer
 // m, such that f(m) = 0 mod n.
 pub fn select(n: &Integer, params: &Params) -> (MpPolynomial, Integer) {
@@ -148,7 +164,7 @@ pub fn select(n: &Integer, params: &Params) -> (MpPolynomial, Integer) {
 
     let mut f = MpPolynomial::new();
     let mut x = n.clone();
-    for i in 0..d {
+    for i in 0..=d {
         f[i] = (&x % &m).complete();
         x /= &m;
     }

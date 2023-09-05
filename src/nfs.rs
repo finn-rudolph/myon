@@ -1,5 +1,6 @@
 use std::cmp::min;
 
+use log::info;
 use rug::{
     ops::{NegAssign, Pow},
     Complete, Integer,
@@ -100,6 +101,9 @@ pub fn factorize(n: &Integer) -> Vec<Integer> {
     let params = Params::new(&n);
     let (f, m) = polynomial::select(n, &params);
 
+    info!("set d = {}, m = {}", params.polynomial_degree, &m);
+    info!("selected the polynomial {}", &f);
+
     // Maybe check that the polynomial is irreducible
     let rational_base = rational_factor_base(&m, &params);
     let algebraic_base = algebraic_factor_base(&f, &params);
@@ -109,6 +113,15 @@ pub fn factorize(n: &Integer) -> Vec<Integer> {
     let algebraic_begin = rational_begin + rational_base.len();
     let quad_char_begin = algebraic_begin + algebraic_base.len();
     let base_len = quad_char_begin + quad_char_base.len();
+
+    info!(
+        "set up factor base consisting of {} primes on the rational side, {} prime ideals on the \
+         algebraic side and {} quadratic characters (total size: {})",
+        rational_base.len(),
+        algebraic_base.len(),
+        quad_char_base.len(),
+        base_len
+    );
 
     let mut matrix_builder = CscMatrixBuilder::new();
     matrix_builder.set_num_rows(quad_char_begin + quad_char_base.len());
@@ -176,6 +189,8 @@ pub fn factorize(n: &Integer) -> Vec<Integer> {
             break;
         }
     }
+
+    info!("collected {} relations", relations.len());
 
     let (mat, num_dependencies) = lanczos::find_dependencies(&matrix_builder.build());
     let mut factors: Vec<Integer> = Vec::new();
