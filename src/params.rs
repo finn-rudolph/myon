@@ -4,6 +4,8 @@ pub const MAX_DEGREE: usize = Params::PARAM_TABLE[Params::PARAM_TABLE.len() - 1]
     .1
     .polynomial_degree;
 
+pub const OVERSQUARENESS: usize = 10;
+
 #[derive(Clone, Copy)]
 pub struct Params {
     pub rational_base_size: usize,
@@ -12,20 +14,20 @@ pub struct Params {
     pub polynomial_degree: usize,
     pub sieve_array_size: usize,
     pub rational_fudge: i8,
-    pub algebraic_fudge: i8,
+    pub algebraic_threshold: i8,
 }
 
 impl Params {
     pub const PARAM_TABLE: [(u32, Params); 1] = [(
-        128,
+        64,
         Params {
-            rational_base_size: 500,
-            algebraic_base_size: 500,
-            quad_char_base_size: 100,
+            rational_base_size: 1000,
+            algebraic_base_size: 1000,
+            quad_char_base_size: 50,
             polynomial_degree: 3,
-            sieve_array_size: 10000,
-            rational_fudge: 20,
-            algebraic_fudge: 40,
+            sieve_array_size: 20000,
+            rational_fudge: 10,
+            algebraic_threshold: 13,
         },
     )];
 

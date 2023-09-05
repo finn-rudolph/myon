@@ -1,5 +1,6 @@
 use std::cmp::max;
 
+use log::info;
 use rand::{thread_rng, Rng};
 use rug::{ops::Pow, Complete, Integer};
 
@@ -15,15 +16,26 @@ use crate::{
 pub fn algebraic_sqrt(integers: &Vec<MpPolynomial>, f: &MpPolynomial) -> MpPolynomial {
     let s = mul_algebraic_integers(integers, f);
     let p = select_p(f);
+
+    info!("chose the prime for lifting p = {}", p);
+
     let mut r = GfMpPolynomial::from(&inv_sqrt_mod_p(
         &GfPolynomial::from_mp_polynomial(&s, p),
         &GfPolynomial::from_mp_polynomial(&f, p),
     ));
 
+    info!("calculated initial inverse sqrt");
+
     let max_coeffiecient = s
         .coefficients_ref()
         .iter()
         .fold(Integer::new(), |acc, x| max(acc, x.clone().abs()));
+
+    info!(
+        "estimated the size of the largest coefficient to be around {}",
+        &max_coeffiecient
+    );
+
     let mut q = Integer::from(p);
 
     while &q < &max_coeffiecient {

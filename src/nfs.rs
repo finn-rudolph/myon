@@ -10,7 +10,7 @@ use crate::{
     lanczos,
     linalg::CscMatrixBuilder,
     nt,
-    params::Params,
+    params::{Params, OVERSQUARENESS},
     polynomial::{self, MpPolynomial, Polynomial},
     sqrt,
 };
@@ -135,7 +135,7 @@ pub fn factorize(n: &Integer) -> Vec<Integer> {
             .fill(-((ilog2_rounded(b) + m.significant_bits()) as i8) + params.rational_fudge);
         line_sieve(b, &mut rational_sieve_array, &rational_base);
 
-        algebraic_sieve_array.fill(-params.algebraic_fudge);
+        algebraic_sieve_array.fill(-params.algebraic_threshold);
         line_sieve(b, &mut algebraic_sieve_array, &algebraic_base);
 
         let a0 = -(params.sieve_array_size as i32 / 2);
@@ -185,7 +185,8 @@ pub fn factorize(n: &Integer) -> Vec<Integer> {
             }
         }
 
-        if relations.len() > base_len {
+        info!("collected {} relations", relations.len());
+        if relations.len() > base_len + OVERSQUARENESS {
             break;
         }
     }
@@ -194,6 +195,8 @@ pub fn factorize(n: &Integer) -> Vec<Integer> {
 
     let (mat, num_dependencies) = lanczos::find_dependencies(&matrix_builder.build());
     let mut factors: Vec<Integer> = Vec::new();
+
+    info!("beginning sqrt phase");
 
     for i in 0..num_dependencies {
         let mut rational: Vec<Integer> = Vec::new();
