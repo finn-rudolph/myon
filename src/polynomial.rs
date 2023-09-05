@@ -38,16 +38,16 @@ impl MpPolynomial {
     {
         let mut z = Integer::from(1);
         let mut y = self[0].clone();
-        for coefficient in self.0.iter().skip(1) {
-            y += coefficient * &z;
+        for coefficient in self.coefficients_ref().iter().skip(1) {
             z *= x;
+            y += coefficient * &z;
         }
         y
     }
 
     pub fn derivative(&self) -> MpPolynomial {
         let mut f = MpPolynomial::new();
-        for (i, coefficient) in self.0.iter().skip(1).enumerate() {
+        for (i, coefficient) in self.coefficients_ref().iter().skip(1).enumerate() {
             f[i] = (coefficient * (i + 1)).complete();
         }
         f
