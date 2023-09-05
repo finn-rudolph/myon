@@ -35,8 +35,8 @@ pub fn algebraic_sqrt(integers: &Vec<MpPolynomial>, f: &MpPolynomial) -> MpPolyn
         .fold(Integer::new(), |acc, x| max(acc, x.clone().abs()));
 
     info!(
-        "estimated the size of the largest coefficient to be around {}",
-        &max_coeffiecient
+        "estimated the size of the largest coefficient to be around {} bits",
+        max_coeffiecient.significant_bits()
     );
 
     let mut q = Integer::from(p);
@@ -62,7 +62,7 @@ pub fn algebraic_sqrt(integers: &Vec<MpPolynomial>, f: &MpPolynomial) -> MpPolyn
 
     info!("finished lifting");
 
-    MpPolynomial::from(r)
+    f.mul_mod(&MpPolynomial::from(r), &s)
 }
 
 fn mul_algebraic_integers(integers: &[MpPolynomial], f: &MpPolynomial) -> MpPolynomial {
@@ -86,21 +86,6 @@ fn select_p(f: &MpPolynomial) -> u64 {
     }
 }
 
-// Multiplies u * v modulo y^2 - s, where u, v and s are degree one polynomials in y, whose
-// coefficients are polynomials in x. All operations on polynomials in x are done modulo f.
-fn mul_y_polynomials(
-    u: &(GfPolynomial, GfPolynomial),
-    v: &(GfPolynomial, GfPolynomial),
-    s: &GfPolynomial,
-    f: &GfPolynomial,
-) -> (GfPolynomial, GfPolynomial) {
-    (
-        f.mul_mod(&u.0, &v.0)
-            .add(&f.mul_mod(&f.mul_mod(&u.1, &v.1), &s)),
-        f.mul_mod(&u.0, &v.1).add(&f.mul_mod(&u.1, &v.0)),
-    )
-}
-
 // Compute a square root of s mod p (and, as always, mod f). The algorithm is from Jensen, P. L.
 // (2005).
 fn inv_sqrt_mod_p(s: &GfPolynomial, f: &GfPolynomial) -> GfPolynomial {
@@ -116,7 +101,7 @@ fn inv_sqrt_mod_p(s: &GfPolynomial, f: &GfPolynomial) -> GfPolynomial {
         while u.0[d - 1] == 0 {
             u.0[d - 1] = rng.gen_range(0..p);
         }
-        u.1[0] = 1;
+        u.1[0] = p - 1;
 
         let mut v = (GfPolynomial::new(p), GfPolynomial::new(p));
         v.0[0] = 1;
@@ -130,11 +115,26 @@ fn inv_sqrt_mod_p(s: &GfPolynomial, f: &GfPolynomial) -> GfPolynomial {
             e >>= 1;
         }
 
-        let z = f.mul_mod(s, &f.mul_mod(&u.1, &u.1));
+        let z = f.mul_mod(s, &f.mul_mod(&v.1, &v.1));
         if z.degree() == 0 && z[0] == 1 {
-            return u.1;
+            return v.1;
         }
     }
+}
+
+// Multiplies u * v modulo y^2 - s, where u, v and s are degree one polynomials in y, whose
+// coefficients are polynomials in x. All operations on polynomials in x are done modulo f.
+fn mul_y_polynomials(
+    u: &(GfPolynomial, GfPolynomial),
+    v: &(GfPolynomial, GfPolynomial),
+    s: &GfPolynomial,
+    f: &GfPolynomial,
+) -> (GfPolynomial, GfPolynomial) {
+    (
+        f.mul_mod(&u.0, &v.0)
+            .add(&f.mul_mod(&f.mul_mod(&u.1, &v.1), &s)),
+        f.mul_mod(&u.0, &v.1).add(&f.mul_mod(&u.1, &v.0)),
+    )
 }
 
 // Caclculates the square root of the product of a set of rational integers.
