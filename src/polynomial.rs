@@ -1,7 +1,7 @@
 use core::mem::swap;
 use std::ops::{Index, IndexMut, MulAssign};
 
-use rug::{ops::Pow, Complete, Integer};
+use rug::{Complete, Integer};
 
 use crate::{
     gfpolynomial::GfMpPolynomial,
@@ -140,16 +140,19 @@ impl From<GfMpPolynomial> for MpPolynomial {
     }
 }
 
-// Polynomial selection for numbers of the form r^e - s, with small r and |s|. Returns the selected
-// polynomial and an integer m, such that f(m) = 0 mod n.
-pub fn select_special(r: u32, e: u32, s: i32, params: &Params) -> (MpPolynomial, Integer) {
+// Naive polynomial selection for general integers. Returns the selected polynomial and an integer
+// m, such that f(m) = 0 mod n.
+pub fn select(n: &Integer, params: &Params) -> (MpPolynomial, Integer) {
     let d = params.polynomial_degree;
-    let k = (e + d as u32 - 1) / d as u32;
+    let m = n.root_ref(d as u32).complete();
 
     let mut f = MpPolynomial::new();
-    f[d as usize] = Integer::from(1);
-    f[0] = Integer::from(s * r.pow(k * d as u32 - e) as i32);
-    assert_eq!(f.degree(), params.polynomial_degree);
+    let mut x = n.clone();
+    for i in 0..d {
+        f[i] = (&x % &m).complete();
+        x /= &m;
+    }
+    assert_eq!(x, 0);
 
-    (f, Integer::from(r).pow(k))
+    (f, m)
 }

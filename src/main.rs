@@ -12,36 +12,20 @@ use std::io;
 use std::io::Write;
 
 use rug::Complete;
-use rug::{ops::Pow, Integer};
-
-fn read_int<T: std::str::FromStr>() -> T
-where
-    <T as std::str::FromStr>::Err: std::fmt::Debug,
-{
-    let mut buf = String::new();
-    io::stdin()
-        .read_line(&mut buf)
-        .expect("Failed to read integer.");
-    buf.trim().parse().expect("Input is not a valid integer.")
-}
+use rug::Integer;
 
 fn main() {
     env::set_var("RUST_LOG", "info");
     env_logger::init();
 
-    println!("You can factor numbers of the form r^e - s, where r and |s| are preferably small.");
-    print!("r: ");
+    print!("Enter number to be factored: ");
     let _ = io::stdout().flush();
-    let r = read_int::<u32>();
-    print!("e: ");
-    let _ = io::stdout().flush();
-    let e = read_int::<u32>();
-    print!("s: ");
-    let _ = io::stdout().flush();
-    let s = read_int::<i32>();
-
-    let n: Integer = Integer::from(r).pow(e) - s;
-    let factors = nfs::factorize(r, e, s);
+    let mut buf = String::new();
+    io::stdin()
+        .read_line(&mut buf)
+        .expect("Failed to read integer.");
+    let n = Integer::parse(buf).unwrap().complete();
+    let factors = nfs::factorize(&n);
 
     println!("Found the following factorizations:\n");
     for a in factors {

@@ -96,11 +96,10 @@ fn norm(f: &MpPolynomial, a: i32, b: u32) -> Integer {
     result
 }
 
-pub fn factorize(r: u32, e: u32, s: i32) -> Vec<Integer> {
-    let n: Integer = Integer::from(r).pow(e) - s;
-
+pub fn factorize(n: &Integer) -> Vec<Integer> {
     let params = Params::new(&n);
-    let (f, m) = polynomial::select_special(r, e, s, &params);
+    let (f, m) = polynomial::select(n, &params);
+
     // Maybe check that the polynomial is irreducible
     let rational_base = rational_factor_base(&m, &params);
     let algebraic_base = algebraic_factor_base(&f, &params);
