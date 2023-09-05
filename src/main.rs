@@ -9,6 +9,7 @@ mod sqrt;
 
 use std::env;
 use std::io;
+use std::io::Write;
 
 use rug::Complete;
 use rug::{ops::Pow, Integer};
@@ -30,10 +31,13 @@ fn main() {
 
     println!("You can factor numbers of the form r^e - s, where r and |s| are preferably small.");
     print!("r: ");
+    let _ = io::stdout().flush();
     let r = read_int::<u32>();
     print!("e: ");
+    let _ = io::stdout().flush();
     let e = read_int::<u32>();
     print!("s: ");
+    let _ = io::stdout().flush();
     let s = read_int::<i32>();
 
     let n: Integer = Integer::from(r).pow(e) - s;

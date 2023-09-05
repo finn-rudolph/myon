@@ -1,3 +1,5 @@
+use std::cmp::max;
+
 use rand::{thread_rng, Rng};
 use rug::{ops::Pow, Complete, Integer};
 
@@ -18,10 +20,13 @@ pub fn algebraic_sqrt(integers: &Vec<MpPolynomial>, f: &MpPolynomial) -> MpPolyn
         &GfPolynomial::from_mp_polynomial(&f, p),
     ));
 
-    let max_coeffiecient = s.coefficients_ref().iter().max().unwrap();
+    let max_coeffiecient = s
+        .coefficients_ref()
+        .iter()
+        .fold(Integer::new(), |acc, x| max(acc, x.clone().abs()));
     let mut q = Integer::from(p);
 
-    while &q < max_coeffiecient {
+    while &q < &max_coeffiecient {
         q.square_mut();
         let f_mod_q = GfMpPolynomial::from_mp_polynomial(f, q.clone());
         let mut t = f_mod_q.mul_mod(
@@ -98,7 +103,6 @@ fn inv_sqrt_mod_p(s: &GfPolynomial, f: &GfPolynomial) -> GfPolynomial {
 
         let mut v = (GfPolynomial::new(p), GfPolynomial::new(p));
         v.0[0] = 1;
-        v.1[0] = 1;
 
         let mut e: Integer = (Integer::from(p).pow(d as u32) - 1) / 2;
         while e != 0 {

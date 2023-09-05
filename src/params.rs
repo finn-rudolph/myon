@@ -11,7 +11,8 @@ pub struct Params {
     pub quad_char_base_size: usize,
     pub polynomial_degree: usize,
     pub sieve_array_size: usize,
-    pub fudge: i8, // different fudge for rational and algebraic side?
+    pub rational_fudge: i8,
+    pub algebraic_fudge: i8,
 }
 
 impl Params {
@@ -23,7 +24,8 @@ impl Params {
             quad_char_base_size: 100,
             polynomial_degree: 3,
             sieve_array_size: 10000,
-            fudge: 20,
+            rational_fudge: 20,
+            algebraic_fudge: 40,
         },
     )];
 

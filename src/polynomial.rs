@@ -1,8 +1,5 @@
 use core::mem::swap;
-use std::{
-    cmp::PartialOrd,
-    ops::{Index, IndexMut, MulAssign, Rem, Sub},
-};
+use std::ops::{Index, IndexMut, MulAssign};
 
 use rug::{ops::Pow, Complete, Integer};
 
@@ -48,24 +45,20 @@ impl MpPolynomial {
     pub fn derivative(&self) -> MpPolynomial {
         let mut f = MpPolynomial::new();
         for (i, coefficient) in self.0.iter().skip(1).enumerate() {
-            f[i - 1] = (coefficient * i).complete();
+            f[i] = (coefficient * (i + 1)).complete();
         }
         f
     }
 
-    pub fn find_roots_mod_p<T>(&self, p: T) -> Vec<T>
-    where
-        Integer: Rem<T> + MulAssign<T>,
-        <Integer as Rem<T>>::Output: PartialEq<i32>,
-        T: Sub<T, Output = T> + PartialOrd + Copy,
-    {
-        let mut roots: Vec<T> = Vec::new();
+    pub fn find_roots_mod_p(&self, p: u32) -> Vec<u32> {
+        let mut roots: Vec<u32> = Vec::new();
 
-        let i: T = p - p;
+        let mut i = 0;
         while i < p {
             if self.evaluate(i) % p == 0 {
                 roots.push(i);
             }
+            i += 1;
         }
 
         roots

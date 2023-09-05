@@ -2,8 +2,6 @@ use log::{info, warn};
 
 use crate::linalg::{block_matrix, BlockMatrix, CscMatrix, N};
 
-// TODO: add bitmask macro / function / table
-
 // Finds the largest possible amount of rows / columns, such that the principal submatrix of vtav as
 // indicated by d is invertible. This function is inspired by the pseudocode in Montgomery, P. L.
 // (1995), page 116 and the implementation in msieve.
@@ -105,7 +103,7 @@ fn update_delta(
     res
 }
 
-// Finds a matrix x, such that a * x = a * y, but x != y, where A = b * bT.
+// Finds a matrix x, such that a * x = a * y, but x != y, where a = b * bT.
 fn lanczos(b: &CscMatrix, y: &BlockMatrix) -> (BlockMatrix, BlockMatrix) {
     let (n, m) = (b.num_cols(), b.num_rows());
 

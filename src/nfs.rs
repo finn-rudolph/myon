@@ -1,4 +1,4 @@
-use std::cmp::{max, min};
+use std::cmp::min;
 
 use rug::{
     ops::{NegAssign, Pow},
@@ -100,7 +100,6 @@ pub fn factorize(r: u32, e: u32, s: i32) -> Vec<Integer> {
     let n: Integer = Integer::from(r).pow(e) - s;
 
     let params = Params::new(&n);
-    let d = params.polynomial_degree;
     let (f, m) = polynomial::select_special(r, e, s, &params);
     // Maybe check that the polynomial is irreducible
     let rational_base = rational_factor_base(&m, &params);
@@ -110,6 +109,7 @@ pub fn factorize(r: u32, e: u32, s: i32) -> Vec<Integer> {
     let rational_begin: usize = 1;
     let algebraic_begin = rational_begin + rational_base.len();
     let quad_char_begin = algebraic_begin + algebraic_base.len();
+    let base_len = quad_char_begin + quad_char_base.len();
 
     let mut matrix_builder = CscMatrixBuilder::new();
     matrix_builder.set_num_rows(quad_char_begin + quad_char_base.len());
@@ -120,19 +120,13 @@ pub fn factorize(r: u32, e: u32, s: i32) -> Vec<Integer> {
 
     for b in 1.. {
         rational_sieve_array
-            .fill(-((ilog2_rounded(b) + m.significant_bits()) as i8) + params.fudge);
+            .fill(-((ilog2_rounded(b) + m.significant_bits()) as i8) + params.rational_fudge);
         line_sieve(b, &mut rational_sieve_array, &rational_base);
 
-        // TODO: Fix this
-        let log_tbd =
-            (d as u32 * ilog2_rounded(b) + ilog2_rounded(f[d as usize].to_u32().unwrap())) as i8;
-        let a0 = -(params.sieve_array_size as i32 / 2);
-        for i in 0..params.sieve_array_size {
-            algebraic_sieve_array[i] =
-                max((d as i32 * (a0 + i as i32)) as i8, log_tbd) + params.fudge;
-        }
+        algebraic_sieve_array.fill(-params.algebraic_fudge);
         line_sieve(b, &mut algebraic_sieve_array, &algebraic_base);
 
+        let a0 = -(params.sieve_array_size as i32 / 2);
         // Consider unsafe access here to avoid bounds checks.
         for i in 0..params.sieve_array_size {
             if rational_sieve_array[i] >= 0 && algebraic_sieve_array[i] >= 0 {
@@ -177,6 +171,10 @@ pub fn factorize(r: u32, e: u32, s: i32) -> Vec<Integer> {
                     relations.push((a as u32, b));
                 }
             }
+        }
+
+        if relations.len() > base_len {
+            break;
         }
     }
 
