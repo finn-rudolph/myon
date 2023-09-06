@@ -19,8 +19,6 @@ pub fn algebraic_sqrt(integers: &Vec<MpPolynomial>, f: &MpPolynomial) -> MpPolyn
         &f.mul_mod(&f.derivative(), &f.derivative()),
     );
 
-    info!("calculated the product of the algebraic integers");
-
     let p = select_p(f);
 
     info!("chose the prime for lifting p = {}", p);
@@ -30,8 +28,6 @@ pub fn algebraic_sqrt(integers: &Vec<MpPolynomial>, f: &MpPolynomial) -> MpPolyn
         &GfPolynomial::from_mp_polynomial(&f, p),
     ));
 
-    info!("calculated initial inverse sqrt");
-
     let num_iterations = (s
         .coefficients_ref()
         .iter()
@@ -39,7 +35,7 @@ pub fn algebraic_sqrt(integers: &Vec<MpPolynomial>, f: &MpPolynomial) -> MpPolyn
         .significant_bits()
         / p.ilog2())
     .ilog2()
-        + 6;
+        + 4;
 
     info!("doing {} iterations of newtons method", num_iterations);
 
@@ -82,7 +78,7 @@ pub fn algebraic_sqrt(integers: &Vec<MpPolynomial>, f: &MpPolynomial) -> MpPolyn
     let mut result = MpPolynomial::new();
     for (i, coefficient) in result_mod_q.coefficients().into_iter().enumerate() {
         result[i] = coefficient;
-        if result[i].significant_bits() >= q.significant_bits() - 2 {
+        if result[i].significant_bits() >= q.significant_bits() - 1 {
             // When a coefficient is such large, we assume it's actually negative.
             result[i] -= &q;
         }
@@ -107,7 +103,7 @@ fn mul_algebraic_integers(integers: &[MpPolynomial], f: &MpPolynomial) -> MpPoly
 }
 
 fn select_p(f: &MpPolynomial) -> u64 {
-    let mut p: u64 = 100000007;
+    let mut p: u64 = 1000000009;
     loop {
         // p must be inert in the number field, which means f must be irreducible mod p.
         if nt::miller_rabin(p) && GfPolynomial::from_mp_polynomial(f, p).is_irreducible() {

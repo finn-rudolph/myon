@@ -1,6 +1,6 @@
 use std::{cmp::min, mem::swap};
 
-use log::info;
+use log::{debug, info};
 use rug::{
     integer::IntegerExt64,
     ops::{NegAssign, Pow},
@@ -188,10 +188,10 @@ pub fn factorize(n: &Integer) -> Vec<Integer> {
             }
         }
 
-        info!("collected {} relations", relations.len());
         if relations.len() >= base_len + OVERSQUARENESS {
             break;
         }
+        debug!("collected {} relations", relations.len());
     }
 
     info!("collected {} relations", relations.len());
@@ -227,16 +227,32 @@ pub fn factorize(n: &Integer) -> Vec<Integer> {
             }
         }
 
-        let mut a = sqrt::rational_sqrt(&rational);
+        let mut a = sqrt::rational_sqrt(&rational) * f.derivative().evaluate(&m);
         let mut b = sqrt::algebraic_sqrt(&algebraic, &f).evaluate(&m);
+        assert!(a.clone().square() % n == b.clone().square() % n);
 
         if a < b {
             swap(&mut a, &mut b);
         }
 
-        let d = (&a - &b).complete().gcd(&n);
-        if d != 1 && &d != n {
-            factors.push(min((n / &d).complete(), d));
+        {
+            let x = (&a + &b).complete() % n;
+            debug!("(a + b) % n = {}", x);
+            let g = x.gcd(n);
+            debug!("gcd(a + b, n) = {}", g);
+            if g != 1 && &g != n {
+                factors.push(min((n / &g).complete(), g));
+            }
+        }
+
+        {
+            let x = (&a - &b).complete() % n;
+            debug!("(a - b) % n = {}", x);
+            let g = x.gcd(n);
+            debug!("gcd(a - b, n) = {}", g);
+            if g != 1 && &g != n {
+                factors.push(min((n / &g).complete(), g));
+            }
         }
     }
 
