@@ -86,13 +86,13 @@ fn line_sieve(b: u64, sieve_array: &mut Vec<i8>, base: &Vec<(u64, u64)>) {
 fn norm(f: &MpPolynomial, a: i64, b: u64) -> Integer {
     let d = f.degree();
     let mut u = Integer::from(1);
-    let mut v = Integer::from(b).pow(d as u32);
+    let mut v = Integer::from(-(b as i64)).pow(d as u32);
     let mut result = Integer::new();
 
     for coefficient in f.coefficients_ref().iter().take(d + 1) {
         result += coefficient * (&u * &v).complete();
         u *= a;
-        v /= b;
+        v /= -(b as i64);
     }
 
     result
@@ -187,7 +187,7 @@ pub fn factorize(n: &Integer) -> Vec<Integer> {
         }
 
         info!("collected {} relations", relations.len());
-        if relations.len() > base_len + OVERSQUARENESS {
+        if relations.len() >= base_len + OVERSQUARENESS {
             break;
         }
     }
