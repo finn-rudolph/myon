@@ -71,14 +71,16 @@ fn ilog2_rounded(x: u64) -> u32 {
 }
 
 fn line_sieve(b: u64, sieve_array: &mut Vec<i8>, base: &Vec<(u64, u64)>) {
-    let a0: i64 = -(sieve_array.len() as i64 / 2);
+    let a0 = -(sieve_array.len() as i64 / 2);
 
     for (p, r) in base {
-        let log2p = ilog2_rounded(*p) as i8;
-        let mut i = ((-((b * r) as i64) % *p as i64 + *p as i64 - a0) % *p as i64) as usize;
-        while i < sieve_array.len() {
-            sieve_array[i] += log2p;
-            i += *p as usize;
+        if b % p != 0 {
+            let log2p = ilog2_rounded(*p) as i8;
+            let mut i = (((-(((b * r) % p) as i64)) + *p as i64 - a0) % *p as i64) as usize;
+            while i < sieve_array.len() {
+                sieve_array[i] += log2p;
+                i += *p as usize;
+            }
         }
     }
 }
