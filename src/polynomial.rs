@@ -1,6 +1,6 @@
 use core::mem::swap;
 use std::{
-    fmt::Display,
+    fmt::{Debug, Display},
     ops::{Index, IndexMut, MulAssign},
 };
 
@@ -13,7 +13,7 @@ use crate::{
 
 pub trait Polynomial<T>
 where
-    Self: Index<usize> + IndexMut<usize>,
+    Self: Index<usize> + IndexMut<usize> + Debug + Clone + Eq,
 {
     fn degree(&self) -> usize;
 
@@ -24,7 +24,7 @@ where
     fn coefficients_mut(&mut self) -> &mut [T; MAX_DEGREE + 1];
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MpPolynomial([Integer; MAX_DEGREE + 1]);
 
 impl MpPolynomial {

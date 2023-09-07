@@ -9,7 +9,7 @@ use crate::{
     polynomial::{MpPolynomial, Polynomial},
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GfPolynomial {
     coefficients: [u64; MAX_DEGREE + 1],
     modulus: u64,
@@ -173,6 +173,7 @@ impl IndexMut<usize> for GfPolynomial {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GfMpPolynomial {
     coefficients: [Integer; MAX_DEGREE + 1],
     modulus: Integer,

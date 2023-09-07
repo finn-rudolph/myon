@@ -35,7 +35,7 @@ pub fn algebraic_sqrt(integers: &Vec<MpPolynomial>, f: &MpPolynomial) -> MpPolyn
         .significant_bits()
         / p.ilog2())
     .ilog2()
-        + 4;
+        + 3;
 
     info!("doing {} iterations of newtons method", num_iterations);
 
@@ -64,12 +64,14 @@ pub fn algebraic_sqrt(integers: &Vec<MpPolynomial>, f: &MpPolynomial) -> MpPolyn
 
         r = t;
 
-        let h = f_mod_q.mul_mod(
-            &GfMpPolynomial::from_mp_polynomial(&s, q.clone()),
-            &f_mod_q.mul_mod(&r, &r),
-        );
-        assert_eq!(h.degree(), 0);
-        assert_eq!(h[0], 1);
+        {
+            let h = f_mod_q.mul_mod(
+                &GfMpPolynomial::from_mp_polynomial(&s, q.clone()),
+                &f_mod_q.mul_mod(&r, &r),
+            );
+            assert_eq!(h.degree(), 0);
+            assert_eq!(h[0], 1);
+        }
     }
 
     let f_mod_q = GfMpPolynomial::from_mp_polynomial(f, q.clone());
@@ -84,10 +86,7 @@ pub fn algebraic_sqrt(integers: &Vec<MpPolynomial>, f: &MpPolynomial) -> MpPolyn
         }
     }
 
-    let h = f.mul_mod(&result, &result);
-    for (i, coefficient) in h.coefficients().iter().enumerate() {
-        assert_eq!(coefficient, &s[i]);
-    }
+    assert_eq!(f.mul_mod(&result, &result), s);
 
     result
 }

@@ -146,6 +146,10 @@ pub fn factorize(n: &Integer) -> Vec<Integer> {
         for i in 0..params.sieve_array_size {
             if rational_sieve_array[i] >= 0 && algebraic_sieve_array[i] >= 0 {
                 let a = a0 + i as i64;
+                if nt::gcd(((a % b as i64) + b as i64) as u64, b) != 1 || a == 0 {
+                    continue;
+                }
+
                 let mut ones_pos: Vec<usize> = Vec::new();
 
                 // Trial divide on the rational side.
@@ -229,7 +233,7 @@ pub fn factorize(n: &Integer) -> Vec<Integer> {
 
         let mut a = sqrt::rational_sqrt(&rational) * f.derivative().evaluate(&m);
         let mut b = sqrt::algebraic_sqrt(&algebraic, &f).evaluate(&m);
-        assert!(a.clone().square() % n == b.clone().square() % n);
+        assert_eq!(a.clone().square() % n, b.clone().square() % n);
 
         if a < b {
             swap(&mut a, &mut b);
