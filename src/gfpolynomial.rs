@@ -70,13 +70,13 @@ impl GfPolynomial {
 
     fn rem(mut self, modulus: &GfPolynomial) -> GfPolynomial {
         let (d, e) = (self.degree(), modulus.degree());
-        let p = self.modulus;
+        let p = self.modulus();
         let modulus_leading_inv = nt::mod_inv(modulus[e], p);
 
         for i in (e..=d).rev() {
             let quotient = (self[i] * modulus_leading_inv) % p;
             for j in 0..=e {
-                self[j + i - e] = (self[j + i - e] + p - (quotient * modulus[j]) % p) % p;
+                self[i - e + j] = (self[j + i - e] + p - (quotient * modulus[j]) % p) % p;
             }
         }
 
@@ -188,10 +188,12 @@ impl GfMpPolynomial {
     }
 
     pub fn from_mp_polynomial(f: &MpPolynomial, modulus: Integer) -> GfMpPolynomial {
-        let mut g = GfMpPolynomial::new(modulus);
+        let mut g = GfMpPolynomial::new(modulus.clone());
         for (i, coefficient) in f.coefficients_ref().iter().enumerate() {
-            g.coefficients[i] =
-                ((coefficient % g.modulus()).complete() + g.modulus()) % g.modulus();
+            g.coefficients[i] = (coefficient % g.modulus()).complete();
+            if g.coefficients[i] < 0 {
+                g.coefficients[i] += &modulus;
+            }
         }
         g
     }

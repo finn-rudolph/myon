@@ -2,7 +2,10 @@ use std::cmp::max;
 
 use log::info;
 use rand::{thread_rng, Rng};
-use rug::{ops::Pow, Integer};
+use rug::{
+    ops::{NegAssign, Pow},
+    Integer,
+};
 
 use crate::{
     gfpolynomial::{GfMpPolynomial, GfPolynomial},
@@ -35,7 +38,7 @@ pub fn algebraic_sqrt(integers: &Vec<MpPolynomial>, f: &MpPolynomial) -> MpPolyn
         .significant_bits()
         / p.ilog2())
     .ilog2()
-        + 3;
+        + 4;
 
     info!("doing {} iterations of newtons method", num_iterations);
 
@@ -48,30 +51,25 @@ pub fn algebraic_sqrt(integers: &Vec<MpPolynomial>, f: &MpPolynomial) -> MpPolyn
             &GfMpPolynomial::from_mp_polynomial(&s, q.clone()),
             &f_mod_q.mul_mod(&r, &r),
         );
-        for coefficient in t.coefficients_mut() {
-            *coefficient = (&q - coefficient.clone()) % &q;
-        }
-        t[0] += 3;
-        t[0] %= &q;
-        t = f_mod_q.mul_mod(&r, &t);
 
+        t[0] -= 3;
         let two_inv = Integer::from(2).invert(&q).unwrap();
-
         for coefficient in t.coefficients_mut() {
+            coefficient.neg_assign();
+            *coefficient += &q;
             *coefficient *= &two_inv;
             *coefficient %= &q;
         }
 
-        r = t;
+        r = f_mod_q.mul_mod(&r, &t);
 
-        {
-            let h = f_mod_q.mul_mod(
-                &GfMpPolynomial::from_mp_polynomial(&s, q.clone()),
-                &f_mod_q.mul_mod(&r, &r),
-            );
-            assert_eq!(h.degree(), 0);
-            assert_eq!(h[0], 1);
-        }
+        // Perform a check that r is indeed the inverse square root of s mod q.
+        let h = f_mod_q.mul_mod(
+            &GfMpPolynomial::from_mp_polynomial(&s, q.clone()),
+            &f_mod_q.mul_mod(&r, &r),
+        );
+        assert_eq!(h.degree(), 0);
+        assert_eq!(h[0], 1);
     }
 
     let f_mod_q = GfMpPolynomial::from_mp_polynomial(f, q.clone());

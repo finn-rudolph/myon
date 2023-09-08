@@ -54,11 +54,11 @@ impl CscMatrix {
         // Choose the number of nonzero entries for each column at random, then generate the indices
         // of 1s at random, avoiding duplicates in a column.
         for _ in 0..num_cols {
-            let weight = rng.gen_range(0..=max_ones);
+            let weight = rng.gen_range(1..=max_ones);
             for _ in 0..weight {
-                let mut x = rng.gen_range(0..=max_ones);
+                let mut x = rng.gen_range(0..num_rows);
                 while used[x] {
-                    x = rng.gen_range(0..=max_ones);
+                    x = rng.gen_range(0..num_rows);
                 }
                 ones.push(x);
                 used[x] = true;

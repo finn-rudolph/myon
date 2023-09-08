@@ -76,7 +76,7 @@ impl MpPolynomial {
         // of x present in the result are actually shifted up by d - 1.
         let mut result = MpPolynomial::new();
         for i in 0..d {
-            result[i] = (&g[i] * &f[d - 1]).into();
+            result[i] = (&g[i] * &f[d - 1]).complete();
         }
 
         // In each iteration, the leading coffiecient is converted to lower order terms, and the
