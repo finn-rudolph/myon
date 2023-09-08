@@ -1,6 +1,6 @@
 use std::cmp::max;
 
-use log::info;
+use log::{info, warn};
 use rand::{thread_rng, Rng};
 use rug::{
     ops::{NegAssign, Pow},
@@ -16,14 +16,18 @@ use crate::{
 // Calculates the algebraic square root of the product of 'integers' using q-adic newton iteration.
 // Uses divide and conquer to evaluate the product in O(M log n) time, where M is the time needed
 // to multiply two numbers in the order of magnitude of the result.
-pub fn algebraic_sqrt(integers: &Vec<MpPolynomial>, f: &MpPolynomial) -> MpPolynomial {
+pub fn algebraic_sqrt(integers: &Vec<MpPolynomial>, f: &MpPolynomial) -> Option<MpPolynomial> {
     let s = f.mul_mod(
         &mul_algebraic_integers(integers, f),
         &f.mul_mod(&f.derivative(), &f.derivative()),
     );
 
-    let p = select_p(f);
+    let mut p: u64 = 101010;
 
+    // p must be inert in the number field, which means f must be irreducible mod p.
+    while !nt::miller_rabin(p) || !GfPolynomial::from_mp_polynomial(f, p).is_irreducible() {
+        p += 1;
+    }
     info!("chose the prime for lifting p = {}", p);
 
     let mut r = GfMpPolynomial::from(&inv_sqrt_mod_p(
@@ -77,16 +81,20 @@ pub fn algebraic_sqrt(integers: &Vec<MpPolynomial>, f: &MpPolynomial) -> MpPolyn
 
     let mut result = MpPolynomial::new();
     for (i, coefficient) in result_mod_q.coefficients().into_iter().enumerate() {
-        result[i] = coefficient;
-        if result[i].significant_bits() >= q.significant_bits() - 1 {
-            // When a coefficient is such large, we assume it's actually negative.
-            result[i] -= &q;
-        }
+        // When a coefficient is very large, we assume it's actually negative.
+        result[i] = if coefficient.significant_bits() >= q.significant_bits() - 1 {
+            -coefficient
+        } else {
+            coefficient
+        };
     }
 
-    assert_eq!(f.mul_mod(&result, &result), s);
+    if f.mul_mod(&result, &result) == s {
+        return Some(result);
+    }
 
-    result
+    warn!("newtons method failed");
+    return None;
 }
 
 fn mul_algebraic_integers(integers: &[MpPolynomial], f: &MpPolynomial) -> MpPolynomial {
@@ -97,17 +105,6 @@ fn mul_algebraic_integers(integers: &[MpPolynomial], f: &MpPolynomial) -> MpPoly
         &mul_algebraic_integers(&integers[..integers.len() / 2], f),
         &mul_algebraic_integers(&integers[integers.len() / 2..], f),
     )
-}
-
-fn select_p(f: &MpPolynomial) -> u64 {
-    let mut p: u64 = 1000000009;
-    loop {
-        // p must be inert in the number field, which means f must be irreducible mod p.
-        if nt::miller_rabin(p) && GfPolynomial::from_mp_polynomial(f, p).is_irreducible() {
-            return p;
-        }
-        p += 2;
-    }
 }
 
 // Compute a square root of s mod p (and, as always, mod f). The algorithm is from Jensen, P. L.

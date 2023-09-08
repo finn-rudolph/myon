@@ -232,7 +232,10 @@ pub fn factorize(n: &Integer) -> Vec<Integer> {
         }
 
         let mut a = sqrt::rational_sqrt(&rational) * f.derivative().evaluate(&m);
-        let mut b = sqrt::algebraic_sqrt(&algebraic, &f).evaluate(&m);
+        let mut b = match sqrt::algebraic_sqrt(&algebraic, &f) {
+            Some(r) => r.evaluate(&m),
+            None => continue,
+        };
         assert_eq!(a.clone().square() % n, b.clone().square() % n);
 
         if a < b {
