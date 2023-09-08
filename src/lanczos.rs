@@ -278,7 +278,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_lanczos() {
+    fn lanczos_random() {
         for i in 0..116 {
             let n: usize = 597 + 5 * i;
             let m: usize = n - 39;

@@ -268,3 +268,22 @@ pub fn factorize(n: &Integer) -> Vec<Integer> {
 
     factors
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const PRIMES_32: [u32; 3] = [100000007, 998244353, 1000000007];
+
+    #[test]
+    fn factorize_semiprime_64() {
+        for i in 0..PRIMES_32.len() {
+            for j in i + 1..PRIMES_32.len() {
+                let factorization =
+                    factorize(&(Integer::from(PRIMES_32[i]) * Integer::from(PRIMES_32[j])));
+                assert_eq!(factorization.len(), 1);
+                assert_eq!(factorization[0], PRIMES_32[i]);
+            }
+        }
+    }
+}
