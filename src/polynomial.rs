@@ -4,7 +4,7 @@ use std::{
     ops::{Index, IndexMut, MulAssign},
 };
 
-use rug::{integer::IntegerExt64, Complete, Integer};
+use rug::{integer::IntegerExt64, rand::RandState, Complete, Integer};
 
 use crate::{
     gfpolynomial::GfMpPolynomial,
@@ -30,6 +30,15 @@ pub struct MpPolynomial([Integer; MAX_DEGREE + 1]);
 impl MpPolynomial {
     pub fn new() -> MpPolynomial {
         MpPolynomial([Integer::ZERO; MAX_DEGREE + 1])
+    }
+
+    pub fn new_random(degree: usize, max_coefficient_bits: usize) -> MpPolynomial {
+        let mut rng = RandState::new();
+        let mut f = MpPolynomial::new();
+        for coefficient in f.coefficients_mut().iter_mut().take(degree + 1) {
+            *coefficient = Integer::random_bits(max_coefficient_bits as u32, &mut rng).into();
+        }
+        f
     }
 
     pub fn evaluate<T: Copy>(&self, x: T) -> Integer

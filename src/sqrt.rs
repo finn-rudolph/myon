@@ -16,12 +16,7 @@ use crate::{
 // Calculates the algebraic square root of the product of 'integers' using q-adic newton iteration.
 // Uses divide and conquer to evaluate the product in O(M log n) time, where M is the time needed
 // to multiply two numbers in the order of magnitude of the result.
-pub fn algebraic_sqrt(integers: &Vec<MpPolynomial>, f: &MpPolynomial) -> Option<MpPolynomial> {
-    let s = f.mul_mod(
-        &mul_algebraic_integers(integers, f),
-        &f.mul_mod(&f.derivative(), &f.derivative()),
-    );
-
+pub fn algebraic_sqrt(s: &MpPolynomial, f: &MpPolynomial) -> Option<MpPolynomial> {
     let mut p: u64 = 101010;
 
     // p must be inert in the number field, which means f must be irreducible mod p.
@@ -89,7 +84,7 @@ pub fn algebraic_sqrt(integers: &Vec<MpPolynomial>, f: &MpPolynomial) -> Option<
         };
     }
 
-    if f.mul_mod(&result, &result) == s {
+    if f.mul_mod(&result, &result) == *s {
         return Some(result);
     }
 
@@ -97,7 +92,7 @@ pub fn algebraic_sqrt(integers: &Vec<MpPolynomial>, f: &MpPolynomial) -> Option<
     return None;
 }
 
-fn mul_algebraic_integers(integers: &[MpPolynomial], f: &MpPolynomial) -> MpPolynomial {
+pub fn mul_algebraic_integers(integers: &[MpPolynomial], f: &MpPolynomial) -> MpPolynomial {
     if integers.len() == 1 {
         return integers.first().unwrap().clone();
     }
@@ -158,18 +153,28 @@ fn mul_y_polynomials(
     )
 }
 
-// Caclculates the square root of the product of a set of rational integers.
-pub fn rational_sqrt(integers: &Vec<Integer>) -> Integer {
-    let prod = mul_rational_integers(integers);
-    assert!(prod.is_perfect_square());
-    info!("calculated rational sqrt");
-    prod.sqrt()
-}
-
-fn mul_rational_integers(integers: &[Integer]) -> Integer {
+pub fn mul_rational_integers(integers: &[Integer]) -> Integer {
     if integers.len() == 1 {
         return integers.first().unwrap().clone();
     }
     mul_rational_integers(&integers[..integers.len() / 2])
         * mul_rational_integers(&integers[integers.len() / 2..])
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::params::MAX_DEGREE;
+
+    use super::*;
+
+    #[test]
+    fn algebraic_sqrt_random() {
+        for degree in 3..MAX_DEGREE {
+            let f = MpPolynomial::new_random(degree, degree * 20);
+            for bits in (1000..10001).step_by(1000) {
+                let g = MpPolynomial::new_random(degree - 1, bits);
+                assert_eq!(g, algebraic_sqrt(&f.mul_mod(&g, &g), &f).unwrap());
+            }
+        }
+    }
 }

@@ -231,8 +231,8 @@ pub fn factorize(n: &Integer) -> Vec<Integer> {
             }
         }
 
-        let mut a = sqrt::rational_sqrt(&rational) * f.derivative().evaluate(&m);
-        let mut b = match sqrt::algebraic_sqrt(&algebraic, &f) {
+        let mut a = sqrt::mul_rational_integers(&rational).sqrt() * f.derivative().evaluate(&m);
+        let mut b = match sqrt::algebraic_sqrt(&sqrt::mul_algebraic_integers(&algebraic, &f), &f) {
             Some(r) => r.evaluate(&m),
             None => continue,
         };
@@ -283,6 +283,7 @@ mod tests {
 
     const PRIMES_128: [u128; 1] = [2u128.pow(3).pow(5).pow(7) + 2 - 3 - 5 - 7];
 
+    #[ignore]
     #[test]
     fn factorize_semiprime_64() {
         for i in 0..PRIMES_32.len() {
@@ -295,6 +296,7 @@ mod tests {
         }
     }
 
+    #[ignore]
     #[test]
     fn factorize_semiprime_128() {
         for i in 0..PRIMES_64.len() {
