@@ -275,6 +275,14 @@ mod tests {
 
     const PRIMES_32: [u32; 3] = [100000007, 998244353, 1000000007];
 
+    const PRIMES_64: [u64; 3] = [
+        (1u64 << 60) + 33,
+        (1u64 << 61) - 1,
+        (1u64 << 61) + (1u64 << 56) + 61,
+    ];
+
+    const PRIMES_128: [u128; 1] = [2u128.pow(3).pow(5).pow(7) + 2 - 3 - 5 - 7];
+
     #[test]
     fn factorize_semiprime_64() {
         for i in 0..PRIMES_32.len() {
@@ -283,6 +291,18 @@ mod tests {
                     factorize(&(Integer::from(PRIMES_32[i]) * Integer::from(PRIMES_32[j])));
                 assert_eq!(factorization.len(), 1);
                 assert_eq!(factorization[0], PRIMES_32[i]);
+            }
+        }
+    }
+
+    #[test]
+    fn factorize_semiprime_128() {
+        for i in 0..PRIMES_64.len() {
+            for j in i + 1..PRIMES_64.len() {
+                let factorization =
+                    factorize(&(Integer::from(PRIMES_64[i]) * Integer::from(PRIMES_64[j])));
+                assert_eq!(factorization.len(), 1);
+                assert_eq!(factorization[0], PRIMES_64[i]);
             }
         }
     }
