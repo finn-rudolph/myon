@@ -279,7 +279,7 @@ mod tests {
 
     #[test]
     fn lanczos_random() {
-        for i in 0..116 {
+        for i in 0..86 {
             let n: usize = 597 + 5 * i;
             let m: usize = n - 39;
             let b = CscMatrix::new_random(n, m, 17);

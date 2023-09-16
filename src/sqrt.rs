@@ -17,7 +17,7 @@ use crate::{
 // Uses divide and conquer to evaluate the product in O(M log n) time, where M is the time needed
 // to multiply two numbers in the order of magnitude of the result.
 pub fn algebraic_sqrt(s: &MpPolynomial, f: &MpPolynomial) -> Option<MpPolynomial> {
-    let mut p: u64 = 3;
+    let mut p: u64 = 101010;
 
     // p must be inert in the number field, which means f must be irreducible mod p.
     while !nt::miller_rabin(p) || !GfPolynomial::from_mp_polynomial(f, p).is_irreducible() {
@@ -155,23 +155,3 @@ pub fn mul_rational_integers(integers: &[Integer]) -> Integer {
     mul_rational_integers(&integers[..integers.len() / 2])
         * mul_rational_integers(&integers[integers.len() / 2..])
 }
-
-// #[cfg(test)]
-// mod tests {
-//     use crate::params::MAX_DEGREE;
-
-//     use super::*;
-
-//     // TOOD: move random generation of polynomials (and csc matrix) to test code
-
-//     #[test]
-//     fn algebraic_sqrt_random() {
-//         for degree in 3..MAX_DEGREE {
-//             let f = MpPolynomial::new_random(degree, degree * 20);
-//             for bits in (1000..10001).step_by(1000) {
-//                 let g = MpPolynomial::new_random(degree - 1, bits);
-//                 assert_eq!(g, algebraic_sqrt(&f.mul_mod(&g, &g), &f).unwrap());
-//             }
-//         }
-//     }
-// }

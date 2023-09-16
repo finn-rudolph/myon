@@ -289,9 +289,9 @@ mod tests {
         (1u64 << 61) + (1u64 << 56) + 61,
     ];
 
+    // 2^3^5^7 + 2 - 3 - 5 - 7 is prime!
     const PRIMES_128: [u128; 1] = [2u128.pow(3).pow(5).pow(7) + 2 - 3 - 5 - 7];
 
-    #[ignore]
     #[test]
     fn factorize_semiprime_64() {
         for i in 0..PRIMES_32.len() {
