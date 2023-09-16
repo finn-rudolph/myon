@@ -7,7 +7,7 @@ use std::{
 use rug::{integer::IntegerExt64, rand::RandState, Complete, Integer};
 
 use crate::{
-    gfpolynomial::GfMpPolynomial,
+    gfpolynomial::GfPolynomial,
     params::{Params, MAX_DEGREE},
 };
 
@@ -30,15 +30,6 @@ pub struct MpPolynomial([Integer; MAX_DEGREE + 1]);
 impl MpPolynomial {
     pub fn new() -> MpPolynomial {
         MpPolynomial([Integer::ZERO; MAX_DEGREE + 1])
-    }
-
-    pub fn new_random(degree: usize, max_coefficient_bits: usize) -> MpPolynomial {
-        let mut rng = RandState::new();
-        let mut f = MpPolynomial::new();
-        for coefficient in f.coefficients_mut().iter_mut().take(degree + 1) {
-            *coefficient = Integer::random_bits(max_coefficient_bits as u32, &mut rng).into();
-        }
-        f
     }
 
     pub fn evaluate<T: Copy>(&self, x: T) -> Integer
@@ -105,6 +96,15 @@ impl MpPolynomial {
 
         result
     }
+
+    pub fn rem(mut self, p: &Integer) -> MpPolynomial {
+        for coefficient in self.coefficients_mut() {
+            *coefficient %= p;
+            *coefficient += p;
+            *coefficient %= p;
+        }
+        self
+    }
 }
 
 impl Polynomial<Integer> for MpPolynomial {
@@ -143,15 +143,13 @@ impl IndexMut<usize> for MpPolynomial {
     }
 }
 
-impl From<GfMpPolynomial> for MpPolynomial {
-    fn from(f: GfMpPolynomial) -> MpPolynomial {
-        MpPolynomial(f.coefficients())
-    }
-}
-
-impl From<&GfMpPolynomial> for MpPolynomial {
-    fn from(f: &GfMpPolynomial) -> MpPolynomial {
-        MpPolynomial(f.coefficients_ref().clone())
+impl From<&GfPolynomial> for MpPolynomial {
+    fn from(f: &GfPolynomial) -> MpPolynomial {
+        let mut r = MpPolynomial::new();
+        for (i, coefficient) in f.coefficients_ref().iter().enumerate() {
+            r[i] = Integer::from(*coefficient);
+        }
+        r
     }
 }
 
