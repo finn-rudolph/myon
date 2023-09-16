@@ -167,10 +167,12 @@ pub fn factorize(n: &Integer) -> Vec<Integer> {
 
                 // Trial divide on the algebraic side.
                 let mut alg_norm = norm(&f, a, b);
-                for (i, (p, _)) in algebraic_base.iter().enumerate() {
-                    let e = alg_norm.remove_factor_mut(&Integer::from(*p));
-                    if e & 1 == 1 {
-                        ones_pos.push(algebraic_begin + i);
+                for (i, (p, r)) in algebraic_base.iter().enumerate() {
+                    if (a + b as i64 * *r as i64) % *p as i64 == 0 {
+                        let e = alg_norm.remove_factor_mut(&Integer::from(*p));
+                        if e & 1 == 1 {
+                            ones_pos.push(algebraic_begin + i);
+                        }
                     }
                 }
 

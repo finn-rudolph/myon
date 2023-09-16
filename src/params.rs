@@ -34,11 +34,11 @@ impl Params {
         (
             128,
             Params {
-                rational_base_size: 2000,
-                algebraic_base_size: 2000,
+                rational_base_size: 1400,
+                algebraic_base_size: 1400,
                 quad_char_base_size: 64,
                 polynomial_degree: 4,
-                sieve_array_size: 110000,
+                sieve_array_size: 120000,
                 rational_fudge: 10,
                 algebraic_threshold: 30,
             },

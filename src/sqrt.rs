@@ -37,7 +37,7 @@ pub fn algebraic_sqrt(s: &MpPolynomial, f: &MpPolynomial) -> Option<MpPolynomial
         .significant_bits()
         / p.ilog2())
     .ilog2()
-        + 4;
+        + 2;
 
     info!("doing {} iterations of newtons method", num_iterations);
 
@@ -70,18 +70,17 @@ pub fn algebraic_sqrt(s: &MpPolynomial, f: &MpPolynomial) -> Option<MpPolynomial
         s.clone().rem(&q)
     );
 
-    for i in 0..(1 << f.degree()) {
-        let mut result = MpPolynomial::new();
-        for j in 0..f.degree() {
-            result[j] = if (i >> j) & 1 == 1 {
-                result_mod_q[j].clone() - &q
-            } else {
-                result_mod_q[j].clone()
-            };
-        }
-        if f.mul_mod(&result, &result) == *s {
-            return Some(result);
-        }
+    let mut result = MpPolynomial::new();
+    for (i, coefficient) in result_mod_q.coefficients().into_iter().enumerate() {
+        result[i] = if coefficient.significant_bits() + 1 >= q.significant_bits() {
+            coefficient - &q
+        } else {
+            coefficient
+        };
+    }
+
+    if f.mul_mod(&result, &result) == *s {
+        return Some(result);
     }
 
     warn!("newtons method failed");
