@@ -232,7 +232,13 @@ pub fn factorize(n: &Integer) -> Vec<Integer> {
         }
 
         let mut a = sqrt::mul_rational_integers(&rational).sqrt() * f.derivative().evaluate(&m);
-        let mut b = match sqrt::algebraic_sqrt(&sqrt::mul_algebraic_integers(&algebraic, &f), &f) {
+        let mut b = match sqrt::algebraic_sqrt(
+            &f.mul_mod(
+                &sqrt::mul_algebraic_integers(&algebraic, &f),
+                &f.mul_mod(&f.derivative(), &f.derivative()),
+            ),
+            &f,
+        ) {
             Some(r) => r.evaluate(&m),
             None => continue,
         };
